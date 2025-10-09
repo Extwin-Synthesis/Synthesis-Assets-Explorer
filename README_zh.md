@@ -18,7 +18,7 @@ Synthesis Assets Explorer 是一个用于在 Omniverse 平台（Isaac Sim，USD 
 - 驱动：所有关节均默认添加了 Velocity Driver，使用加速度驱动（轨迹优先），并添加阻尼和刚度，具体参数您可以在使用时按照要求调整
 - 材质：所有材质均按照材质不同添加了对应的物理材质并给了基本的摩擦、密度等参数，具体使用中按照要求调整
 - 脚本节点：部分资产包含脚本节点，用于模拟更加准确的物理效果（比如：随着开门角度改变，关节阻尼发生变化）
-- 参考：我们参与的开源项目[ArtVIP](x-humanoid-artvip.github.io)相关的论文中有详细的描述，请参阅
+- 参考：我们参与的开源项目[ArtVIP](https://x-humanoid-artvip.github.io)相关的论文中有详细的描述，请参阅
 
 2) 带有灯光、PBR 材质、标注的真实建筑的建筑模型和建筑空间（持续添加中）
 - 来源于真实项目的 BIM（Building Information Model）模型
