@@ -7,19 +7,19 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 
 ## About the open source assets on https://synthesis.extwin.com
 
-1) Articulated Sim‑Ready assets with joints, physics parameters, semantic, and PBR materials (continuously growing)
+1) Articulated Sim‑Ready assets with joints, physics parameters, semantic, and PBR materials (continuously adding)
 - Fidelity: assets are reverse‑modeled as close as possible to real‑world objects at 1:1 scale to ensure quality.
 - Joints: most Sim‑Ready objects include joints and follow a unified naming convention.
-- Collider: all objects include collision shapes. SDF is used by default; depending on the case, convex decomposition or convex hulls are used. You can adjust or add simplified colliders as needed.
+- Collider: all objects include colliders. SDF is used by default; depending on the case, convex decomposition or convex hulls are used. You can adjust or add simplified colliders as needed.
 - Rigid/Deformable: all Mesh prims are authored with appropriate rigid and deformable body.
 - Coordinates: for convenience, the origin is set to the asset’s bottom center. No transforms are authored on Mesh prims; transforms are authored on parent Xform prims. Joint locations align exactly with Body1’s pivot.
 - Semantic: all Xform prims include Semantic Data.
 - Articulate Drive: all joints include a default Velocity Drive using acceleration‑based control (trajectory‑first) with damping and stiffness. You can tune parameters as required.
 - Materials: PBR materials and physics materials are assigned according to visual material types, with baseline friction, density, etc. Adjust in your use case as needed.
-- Script Nodes: some assets include script nodes to simulate more accurate physical behavior (e.g., hinge damping varying with door angle).
+- Script: some assets include script nodes to simulate more accurate physical behavior (e.g., hinge damping varying with door angle).
 - References: see papers from open‑source project we contributed [ArtVIP](https://x-humanoid-artvip.github.io)for detailed descriptions.
 
-2) Real‑world architectural models and spaces with lighting, PBR materials, and semantic data (continuously growing)
+2) Real‑world building models and spaces with lighting, PBR materials, and semantic data (continuously adding)
 - Sourced from real project BIM (Building Information Model) model.
 - Includes complete building component hierarchies and detailed properties.
 - Currently provides partial spaces; full buildings/spaces will be added (residential, hospital, commercial, airport, substation, metro, etc.).
@@ -28,7 +28,7 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 - Based on the 3DGrut project.
 - Currently offers sample scenes.
 
-4) Fully interactive scenes composed from Sim‑Ready assets, models, and 3D Gaussian Splatting (continuously growing)
+4) Fully interactive scenes composed from Sim‑Ready assets, models, and 3D Gaussian Splatting (continuously adding)
 
 5) All assets are available in OpenUSD format for download (MJCF conversion to be released)
 
@@ -49,7 +49,7 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 1) Browsing
 
 2) Sim‑Ready
-- Because no test Fixed Joint is included by default, when pressing Play add a Ground Plane or add a Fixed Joint to a body.
+- Because no test Fixed Joint is included, please add a Ground Plane or add a Fixed Joint to a body when play.
 - If you see rendering issues with transparent objects, adjust the relevant parameter accordingly.
 
 3) Model
@@ -59,7 +59,7 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 - To sharpen 3D Gaussian Splatting, adjust the following parameters; note this may affect other objects (pending Omniverse optimization).
 
 5) Scenes
-- Scenes may contain many assets. Some users may experience jitter from collisions when pressing Play; please fine‑tune as needed. We strive to eliminate such cases in testing, but due to hardware variability some users may still encounter them.
+- because of contain many assets,some scenes maybe have viberation when play due to the collission; please fine‑tune as needed. We strive to eliminate such cases in testing, but due to hardware variability some users may still encounter them.
 
 ## Custom asset requests
 
