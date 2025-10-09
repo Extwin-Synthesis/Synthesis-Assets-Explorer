@@ -1,7 +1,7 @@
 # Synthesis Assets Explorer
 
 Discover massive open-source OpenUSD Sim‑Ready assets.<br><br>
-[English](https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer/README.md)|[中文](https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer/README_zh.md)
+[English](https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer/blob/main/README.md)|[中文](https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer/blob/main/README_zh.md)
 <br><br>
 Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and load high‑quality OpenUSD Sim‑Ready assets, architectural models, 3D Gaussian Splatting, and fully interactive scenes from https://synthesis.extwin.com into Omniverse applications (Isaac Sim, USD Composer). You can access and load assets from https://synthesis.extwin.com just like using NVIDIA’s official asset libraries.
 
