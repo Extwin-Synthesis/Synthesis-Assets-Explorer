@@ -17,7 +17,7 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 - Articulate Drive: all joints include a default Velocity Drive using acceleration‑based control (trajectory‑first) with damping and stiffness. You can tune parameters as required.
 - Materials: PBR materials and physics materials are assigned according to visual material types, with baseline friction, density, etc. Adjust in your use case as needed.
 - Script Nodes: some assets include script nodes to simulate more accurate physical behavior (e.g., hinge damping varying with door angle).
-- References: see papers from open‑source project we contributed [ArtVIP](x-humanoid-artvip.github.io） for detailed descriptions.
+- References: see papers from open‑source project we contributed [ArtVIP](https://x-humanoid-artvip.github.io)for detailed descriptions.
 
 2) Real‑world architectural models and spaces with lighting, PBR materials, and semantic data (continuously growing)
 - Sourced from real project BIM (Building Information Model) model.
