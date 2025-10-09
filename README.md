@@ -38,11 +38,11 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 
 8) License: CC BY‑NC 4.0
 
-## Installation
-
-### Supported versions
+## Requirments
 - Omniverse Kit 107.3+
 - Isaac Sim 5.0+
+- 
+## Installation
 
 ## Usage
 
