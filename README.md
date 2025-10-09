@@ -61,7 +61,7 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 5) Scenes
 - because of contain many assets,some scenes maybe have viberation when play due to the collission; please fine‑tune as needed. We strive to eliminate such cases in testing, but due to hardware variability some users may still encounter them.
 
-## Custom asset requests
+## Make Sim-ready
 
 If you have specific asset requirements, please let us know:
 
