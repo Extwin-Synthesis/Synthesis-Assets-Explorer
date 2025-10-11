@@ -6,7 +6,7 @@ Discover massive open-source OpenUSD Sim‑Ready assets.<br><br>
 Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and load high‑quality OpenUSD articulated Sim‑Ready assets, architectural models, 3D Gaussian Splatting models, and fully interactive scenes from https://synthesis.extwin.com into Omniverse applications (Isaac Sim, USD Composer). You can access and load assets from https://synthesis.extwin.com just like using NVIDIA’s official asset libraries.
 
 
-<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Sim_Ready_2K.mp4" controls width="1280"></video>
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Synthesis_Brief.mp4" controls width="1280"></video>
 
 ## About the open source assets on https://synthesis.extwin.com
 
@@ -22,14 +22,20 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 - Script: some assets include script nodes to simulate more accurate physical behavior (e.g., hinge damping varying with door angle).
 - References: see papers from open‑source project we contributed [ArtVIP](https://x-humanoid-artvip.github.io) for detailed descriptions.
 
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Sim_Ready_2K.mp4" controls width="1280"></video>
+
 2) Real‑world building models and spaces with lighting, PBR materials, and semantic data (continuously adding)
 - Sourced from real project BIM (Building Information Model) model.
 - Includes complete building component hierarchies and detailed properties.
 - Currently provides partial spaces; full buildings/spaces will be added (residential, hospital, commercial, airport, substation, metro, etc.).
 
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Model_2K.mp4" controls width="1280"></video>
+
 3) 3D Gaussian Splatting scenes in USDZ format (continuously growing)
-- Based on the 3DGrut project.
+- Based on the [3DGrut](https://github.com/nv-tlabs/3dgrut) project.
 - Currently offers sample scenes.
+
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/3DGS_2K.mp4" controls width="1280"></video>
 
 4) Fully interactive scenes composed from Sim‑Ready assets, models, and 3D Gaussian Splatting (continuously adding)
 
@@ -39,6 +45,8 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 
 7) Built‑in scene editor for assembling scenes in a WebGL‑enabled browser (Business User Only)
 
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Scene_Editor_2K.mp4" controls width="1280"></video>
+
 8) License: CC BY‑NC 4.0
 
 ## Requirments
@@ -46,45 +54,43 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 - Isaac Sim 5.0+
 
 ## Quick Start
-### 1.Navigate to the corresponding Isaac sim binary directory
+### 1.Navigate to the corresponding Isaac sim binary directory：
 
-    for Linux:'_build/linux-x86_64/release'
-    for windows:'_build/windows-x86_64/release'
+- Linux: `_build/linux-x86_64/release`
+- Windows: `_build/windows-x86_64/release`
 
 ### 2.Clone the Repository
-    ```bash
     git clone https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer.git extwin.synthesis_explorer
     cd extwin.synthesis_explorer
-    ```
 
-### 3.buid
+### 3.Build
+
     Run the following command to initiate:
-    **Linux:**
-    ```bash
-    ./install.sh
-    ```
 
-    **Windows:**
-    ```bash
-    .\install.bat
-    ```
-
+    - Linux: ./install.sh
+    - Windows: .\install.bat
 
 ## Usage
-1) Browsing
+1) Browsing&Loading
+
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Omniverse_Extension_2K.mp4" controls width="1280"></video>
 
 2) Sim‑Ready
 - Because no test Fixed Joint is included, please add a Ground Plane or add a Fixed Joint to a body when play.
 - If you see rendering issues with transparent objects, adjust the relevant parameter accordingly.
+
+<img src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Translucency.png" width="900">
 
 3) Model
 - Likewise, add a Ground Plane or a Fixed Joint.
 
 4) 3D Gaussian Splatting
 - To sharpen 3D Gaussian Splatting, adjust the following parameters; note this may affect other objects (pending Omniverse optimization).
+<img src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/3DGS.png" width="900">
 
 5) Scenes
 - because of contain many assets,some scenes maybe have viberation when play due to the collission; please fine‑tune as needed. We strive to eliminate such cases in testing, but due to hardware variability some users may still encounter them.
+- please be patient when loading scene.
 
 ## Make Sim-ready
 

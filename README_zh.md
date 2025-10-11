@@ -6,6 +6,8 @@ Discover massive open-source OpenUSD Sim‑Ready assets.<br><br>
 
 Synthesis Assets Explorer 是一个用于在 Omniverse 平台（Isaac Sim，USD Composer）中加载 https://synthesis.extwin.com 里 OpenUSD 格式的高质量 Sim‑Ready铰链资产、建筑模型、3D 高斯泼溅模型以及全交互场景的插件。通过这个插件，您可以像访问 NVIDIA 官方资产库一样访问和加载 https://synthesis.extwin.com 中的资产。
 
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Synthesis_Brief.mp4" controls width="1280"></video>
+
 ## 关于 https://synthesis.extwin.com 中的开源资产
 
 1) 带有关节、物理参数、标注和 PBR 材质的 Sim‑Ready 资产库（持续添加中）
@@ -20,14 +22,20 @@ Synthesis Assets Explorer 是一个用于在 Omniverse 平台（Isaac Sim，USD 
 - 脚本节点：部分资产包含脚本节点，用于模拟更加准确的物理效果（比如：随着开门角度改变，关节阻尼发生变化）
 - 参考：我们参与的开源项目[ArtVIP](https://x-humanoid-artvip.github.io)相关的论文中有详细的描述，请参阅
 
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Sim_Ready_2K.mp4" controls width="1280"></video>
+
 2) 带有灯光、PBR 材质、标注的真实建筑的建筑模型和建筑空间（持续添加中）
 - 来源于真实项目的 BIM（Building Information Model）模型
 - 包含完整的建筑对象层级关系及详细属性
 - 目前只是提供了建筑空间的局部，后续会陆续提供完整建筑空间的模型（家庭、医院、商业、机场、变电站、地铁……）
 
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Model_2K.mp4" controls width="1280"></video>
+
 3) USDZ 格式的 3D 高斯泼溅场景（持续增加中）
-- 基于 3DGrut 项目
+- 基于 [3DGrut](https://github.com/nv-tlabs/3dgrut) 项目
 - 目前仅提供了一些示例场景
+
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/3DGS_2K.mp4" controls width="1280"></video>
 
 4) 利用 Sim‑Ready、模型、3D 高斯泼溅搭建的全交互的场景（持续添加中）
 
@@ -37,27 +45,52 @@ Synthesis Assets Explorer 是一个用于在 Omniverse 平台（Isaac Sim，USD 
 
 7) 内建场景编辑器，支持在浏览器（支持 WebGL）中搭建场景（Business User Only）
 
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Scene_Editor_2K.mp4" controls width="1280"></video>
+
 8) 开源协议：CC BY‑NC 4.0
 
 ## 版本要求
 - Omniverse Kit 107.3+
 - Isaac Sim 5.0+
-- 
+
 ## 如何安装
+### 1.定位到Isaac sim执行程序的目录：
+
+- Linux: `_build/linux-x86_64/release`
+- Windows: `_build/windows-x86_64/release`
+
+### 2.Clone文件
+    git clone https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer.git extwin.synthesis_explorer
+    cd extwin.synthesis_explorer
+
+### 3.编译
+
+    执行以下命令:
+
+    - Linux: ./install.sh
+    - Windows: .\install.bat
+
 
 ## 如何使用
 
 1) 浏览&加载
 
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Omniverse_Extension_2K.mp4" controls width="1280"></video>
+
 2) Sim‑Ready
 - 因为没有添加测试用的 Fixed Joint，所以在 Play 时需要添加一个 Ground Plane 或在 Body 对象上添加 Fixed Joint
-- 如果遇到透明物体显示异常，需要调整这个参数
+- 如果遇到透明物体显示异常，需要调整这个参数：
+
+<img src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Translucency.png" width="900">
+
 
 3) Model
 - 同样需要添加 Ground Plane 或者 Fixed Joint
 
 4) 3D 高斯泼溅
-- 如果需要让 3D 高斯泼溅更加清晰，可以修改以下参数，但会影响到其它对象（待 Omniverse 优化）
+- 如果需要让 3D 高斯泼溅更加清晰，可以修改以下参数，但会影响到其它对象（待 Omniverse 优化）：
+
+<img src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/3DGS.png" width="900">
 
 5) 场景
 - 场景中因为资产较多，部分用户在 Play 时可能会有一些因为碰撞引起的抖动，需要您进行微调。我们尽量在测试时消除这些情况，但因为不同的硬件环境，部分用户依然会出现类似的情况。
