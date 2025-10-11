@@ -4,7 +4,7 @@ Discover massive open-source OpenUSD Sim‑Ready assets.<br><br>
 [English](https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer/blob/main/README.md)|[中文](https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer/blob/main/README_zh.md)
 <br><br>
 
-Synthesis Assets Explorer 是一个用于在 Omniverse 平台（Isaac Sim，USD Composer）中加载 https://synthesis.extwin.com 里 OpenUSD 格式的高质量 Sim‑Ready、建筑模型、3D 高斯泼溅以及全交互场景的插件。安装后，您可以像访问 NVIDIA 官方资产库一样访问和加载 https://synthesis.extwin.com 中的资产。
+Synthesis Assets Explorer 是一个用于在 Omniverse 平台（Isaac Sim，USD Composer）中加载 https://synthesis.extwin.com 里 OpenUSD 格式的高质量 Sim‑Ready铰链资产、建筑模型、3D 高斯泼溅模型以及全交互场景的插件。通过这个插件，您可以像访问 NVIDIA 官方资产库一样访问和加载 https://synthesis.extwin.com 中的资产。
 
 ## 关于 https://synthesis.extwin.com 中的开源资产
 

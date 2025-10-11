@@ -62,21 +62,23 @@ echo 调试：将使用 Python 路径: "!OMNIVERSE_PYTHON!"
 :: 真正执行
 call "!OMNIVERSE_PYTHON!" "install.py" %*
 
-:: 拷贝安装脚本的父级目录下的所有内容到与父级目录同级的extsUser目录下
-set "FULL_PATH=%CD%"
-set "FOLDER_NAME=%FULL_PATH%"
+@REM :: 拷贝安装脚本的父级目录下的所有内容到与父级目录同级的extsUser目录下
+@REM set "FULL_PATH=%CD%"
+@REM set "FOLDER_NAME=%FULL_PATH%"
 
-:: 去掉末尾的反斜杠（如果有）
-if "%FOLDER_NAME:~-1%"=="\" set "FOLDER_NAME=%FOLDER_NAME:~0,-1%"
+@REM :: 去掉末尾的反斜杠（如果有）
+@REM if "%FOLDER_NAME:~-1%"=="\" set "FOLDER_NAME=%FOLDER_NAME:~0,-1%"
 
-:: 提取最后一个反斜杠后的完整名称（包括 . 和 _）
-for %%I in ("%FOLDER_NAME%") do set "EXT_NAME=%%~nxI"
+@REM :: 提取最后一个反斜杠后的完整名称（包括 . 和 _）
+@REM for %%I in ("%FOLDER_NAME%") do set "EXT_NAME=%%~nxI"
 
-echo 当前扩展名: !EXT_NAME!
+@REM echo 当前扩展名: !EXT_NAME!
 
 :: 构建 extsUser 路径（与当前扩展目录同级）
 set "EXTS_USER_DIR=!CURRENT_DIR!\extsUser"
-set "DEST_DIR=!EXTS_USER_DIR!\!EXT_NAME!"
+@REM set "DEST_DIR=!EXTS_USER_DIR!\!EXT_NAME!"
+set "DEST_DIR=!EXTS_USER_DIR!\extwin.synthesis_explorer"
+
 
 :: 创建 extsUser 目录（如果不存在）
 if not exist "!EXTS_USER_DIR!" mkdir "!EXTS_USER_DIR!"
@@ -84,7 +86,7 @@ if not exist "!EXTS_USER_DIR!" mkdir "!EXTS_USER_DIR!"
 :: 删除旧版本（仅同名）
 if exist "!DEST_DIR!" (
     echo.
-    echo 正在删除旧版本: !EXT_NAME!
+    echo 正在删除旧版本
     rd /s /q "!DEST_DIR!"
     if exist "!DEST_DIR!" (
         echo 警告：无法删除旧版本，请检查是否被占用。

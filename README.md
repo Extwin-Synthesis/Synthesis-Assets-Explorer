@@ -3,7 +3,10 @@
 Discover massive open-source OpenUSD Sim‑Ready assets.<br><br>
 [English](https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer/blob/main/README.md)|[中文](https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer/blob/main/README_zh.md)
 <br><br>
-Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and load high‑quality OpenUSD Sim‑Ready assets, architectural models, 3D Gaussian Splatting, and fully interactive scenes from https://synthesis.extwin.com into Omniverse applications (Isaac Sim, USD Composer). You can access and load assets from https://synthesis.extwin.com just like using NVIDIA’s official asset libraries.
+Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and load high‑quality OpenUSD articulated Sim‑Ready assets, architectural models, 3D Gaussian Splatting models, and fully interactive scenes from https://synthesis.extwin.com into Omniverse applications (Isaac Sim, USD Composer). You can access and load assets from https://synthesis.extwin.com just like using NVIDIA’s official asset libraries.
+
+
+<video src="https://github.com/Extwin-Synthesis/Synthesis_Video/raw/main/Sim_Ready_2K.mp4" controls width="1280"></video>
 
 ## About the open source assets on https://synthesis.extwin.com
 
@@ -17,7 +20,7 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 - Articulate Drive: all joints include a default Velocity Drive using acceleration‑based control (trajectory‑first) with damping and stiffness. You can tune parameters as required.
 - Materials: PBR materials and physics materials are assigned according to visual material types, with baseline friction, density, etc. Adjust in your use case as needed.
 - Script: some assets include script nodes to simulate more accurate physical behavior (e.g., hinge damping varying with door angle).
-- References: see papers from open‑source project we contributed [ArtVIP](https://x-humanoid-artvip.github.io)for detailed descriptions.
+- References: see papers from open‑source project we contributed [ArtVIP](https://x-humanoid-artvip.github.io) for detailed descriptions.
 
 2) Real‑world building models and spaces with lighting, PBR materials, and semantic data (continuously adding)
 - Sourced from real project BIM (Building Information Model) model.
@@ -41,11 +44,33 @@ Synthesis Assets Explorer is an Omniverse Kit extension that lets you browse and
 ## Requirments
 - Omniverse Kit 107.3+
 - Isaac Sim 5.0+
-- 
-## Installation
+
+## Quick Start
+### 1.Navigate to the corresponding Isaac sim binary directory
+
+    for Linux:'_build/linux-x86_64/release'
+    for windows:'_build/windows-x86_64/release'
+
+### 2.Clone the Repository
+    ```bash
+    git clone https://github.com/Extwin-Synthesis/Synthesis-Assets-Explorer.git extwin.synthesis_explorer
+    cd extwin.synthesis_explorer
+    ```
+
+### 3.buid
+    Run the following command to initiate:
+    **Linux:**
+    ```bash
+    ./install.sh
+    ```
+
+    **Windows:**
+    ```bash
+    .\install.bat
+    ```
+
 
 ## Usage
-
 1) Browsing
 
 2) Sim‑Ready

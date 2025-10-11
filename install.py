@@ -150,7 +150,7 @@ if not KIT_FILE:
         OMNIVERSE_ROOT = find_omniverse_root(SCRIPT_DIR)
         # 尝试多个常见 .kit 文件
         possible_kits = [
-            "apps/isaacsim.exp.full.streaming.kit",
+            "apps/isaacsim.exp.base.kit",
         ]
         for rel_path in possible_kits:
             candidate = os.path.join(OMNIVERSE_ROOT, rel_path)
