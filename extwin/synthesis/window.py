@@ -19,6 +19,8 @@ from .setting_modal import SettingModal
 from omni.kit.window.popup_dialog import MessageDialog
 from .util import on_copy_to_clipboard
 
+# from .loading_fullscreen import FullScreenLoading
+
 # --- Constants and Configuration ---
 EXT_PATH = os.path.dirname(__file__)
 GLOBAL_STYLE = get_style()
@@ -31,8 +33,8 @@ BASE_URL3 = "https://synthesis.extwin.com"
 # Asset type definitions for browsing
 ASSET_TYPES: list = [
     {
-        "Id": "SimReady",
-        "Name": "SimReady",
+        "Id": "Sim Ready",
+        "Name": "Sim Ready",
         "CategoryListUrl": f"{BASE_URL1}/api/SimReady/GetCategoryList",
         "CategoryItemContentUrl": f"{BASE_URL1}/api/SimReady/GetSimReadyList",
         "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetCategoryList",
@@ -378,6 +380,8 @@ class SynthesisAssetsWindow(ui.Window):
         self.deferred_dock_in(
             "Console", active_window=ui.DockPolicy.CURRENT_WINDOW_IS_ACTIVE
         )
+
+        # self._loading = FullScreenLoading()
 
     # --- UI Rebuilding Utilities ---
     def _rebuild_main_view(self):
@@ -1031,12 +1035,15 @@ class SynthesisAssetsWindow(ui.Window):
             asyncio.ensure_future(_async_load())
 
         async def _async_load():
+            _scene_name = self._currently_selected_asset_data.get('Name','')
             nm.post_notification(
-                f"Loading scene...",
+                f"Loading scene {_scene_name} ...",
                 duration=1.0,
                 status=nm.NotificationStatus.INFO,
+                hide_after_timeout=False,
             )
             try:
+                # self._loading.show()
                 load_task = usd_context.open_stage_async(
                     target_usd_url, omni.usd.UsdContextInitialLoadSet.LOAD_ALL
                 )
@@ -1044,6 +1051,7 @@ class SynthesisAssetsWindow(ui.Window):
 
                 await load_task
                 await omni.kit.app.get_app().next_update_async()
+                nm.destroy_all_notifications()
 
                 loaded_stage = usd_context.get_stage()
                 if (
@@ -1052,7 +1060,7 @@ class SynthesisAssetsWindow(ui.Window):
                 ):
                     carb.log_info(f"Successfully loaded scene from {target_usd_url}")
                     nm.post_notification(
-                        f"Scene loaded successfully.",
+                        f"Scene {_scene_name} loaded successfully.",
                         duration=3.0,
                         status=nm.NotificationStatus.INFO,
                     )
@@ -1062,13 +1070,17 @@ class SynthesisAssetsWindow(ui.Window):
                     )
 
             except Exception as e:
-                error_msg = f"Failed to load scene: {e}"
+                nm.destroy_all_notifications()
+                error_msg = f"Failed to load scene {_scene_name}: {e}"
                 carb.log_error(error_msg)
                 nm.post_notification(
                     error_msg,
                     duration=5.0,
                     status=nm.NotificationStatus.WARNING,
                 )
+            # finally:
+            #     if self._loading:
+            #         self._loading.hide()
 
         if stage_has_content:
             dialog = MessageDialog(
@@ -1562,6 +1574,29 @@ class SynthesisAssetsWindow(ui.Window):
     def _populate_grid_items_into_container(
         self, container: ui.VGrid, asset_items: list, thumbnail_api_url: str
     ):
+        def make_on_image_pressed(image_widget: ui.Image, data: Dict[str, Any]):
+            def on_image_pressed(x, y, btn, mod):
+                if btn == 0:  # Left click
+                    if self._currently_selected_image_widget:
+                        self._currently_selected_image_widget.set_style(
+                            IMAGE_STYLE_UNSELECTED
+                        )
+
+                    image_widget.set_style(IMAGE_STYLE_SELECTED)
+                    self._currently_selected_image_widget = image_widget
+
+                    self._currently_selected_asset_data = data
+                    # The image URL needs to be passed to the detail panel
+                    # It's either the thumbnail URL or the empty image path
+                    img_url = (
+                        image_widget.source_url
+                        if image_widget.source_url
+                        else IMAGE_EMPTY_PATH
+                    )
+                    self._build_detail_panel(data, img_url)
+
+            return on_image_pressed
+
         """Actually adds individual asset widgets into the specified container."""
         for item_data in asset_items:
             item_name = item_data.get("Name", "Unnamed Asset")
@@ -1570,49 +1605,20 @@ class SynthesisAssetsWindow(ui.Window):
 
             with container:  # Add directly into passed-in container/VGrid
                 with ui.VStack(spacing=0):
-
-                    def make_on_image_pressed(
-                        image_widget: ui.Image, data: Dict[str, Any]
-                    ):
-                        def on_image_pressed(x, y, btn, mod):
-                            if btn == 0:  # Left click
-                                if self._currently_selected_image_widget:
-                                    self._currently_selected_image_widget.set_style(
-                                        IMAGE_STYLE_UNSELECTED
-                                    )
-
-                                image_widget.set_style(IMAGE_STYLE_SELECTED)
-                                self._currently_selected_image_widget = image_widget
-
-                                self._currently_selected_asset_data = data
-                                # The image URL needs to be passed to the detail panel
-                                # It's either the thumbnail URL or the empty image path
-                                img_url = (
-                                    image_widget.source_url
-                                    if image_widget.source_url
-                                    else IMAGE_EMPTY_PATH
-                                )
-                                self._build_detail_panel(data, img_url)
-
-                        return on_image_pressed
+                    _final_thumbnail_url = IMAGE_EMPTY_PATH
+                    if item_thumbnail_b64:
+                        _final_thumbnail_url = (
+                            f"{thumbnail_api_url}/{item_id}.png?t={time.time()}"
+                        )
 
                     _thumbnail = ui.Image(
-                        "",
+                        _final_thumbnail_url,
                         fill_policy=ui.FillPolicy.PRESERVE_ASPECT_FIT,
                         style=IMAGE_STYLE_UNSELECTED,
                     )
                     _thumbnail.set_mouse_pressed_fn(
                         make_on_image_pressed(_thumbnail, item_data)
                     )
-
-                    _final_thumbnail_url = ""
-                    if item_thumbnail_b64:
-                        _final_thumbnail_url = (
-                            f"{thumbnail_api_url}/{item_id}.png?t={time.time()}"
-                        )
-                    else:
-                        _final_thumbnail_url = IMAGE_EMPTY_PATH
-                    _thumbnail.source_url = _final_thumbnail_url
 
                     if self._selected_asset_type_id != "Scene":
                         _thumbnail.set_drag_fn(

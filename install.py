@@ -1,191 +1,204 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Omniverse 扩展一键安装脚本（优化版）
+# Isaac Sim Extension Installer
+# Cross-platform: Windows, Linux, macOS
 
-功能：
-1. 检测操作系统
-2. 安装 requirements.txt 依赖
-3. 在 .kit 文件 [dependencies] 段末尾添加新依赖（智能去重，忽略版本）
-4. 自动备份原文件
-5. 支持自定义 .kit 文件路径
-"""
-
-import os
 import sys
+import shutil
 import subprocess
 import platform
-import re
-import shutil
-import argparse
+from pathlib import Path
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Omniverse 扩展安装脚本")
-    parser.add_argument("--kit", help="指定 .kit 配置文件路径")
-    parser.add_argument("--ext", help="要添加的扩展名，如 extwin.synthesis_explorer")
-    parser.add_argument(
-        "--requirements", default="requirements.txt", help="依赖文件路径"
+def find_isaac_sim_root():
+    """Find Isaac Sim root directory (must contain 'apps' and 'python.bat' or 'python.sh')"""
+    current_dir = Path(__file__).parent.resolve()
+
+    # Traverse upward from current directory
+    for parent in [current_dir] + list(current_dir.parents):
+        python_exe = None
+        if (parent / "python.bat").exists():
+            python_exe = parent / "python.bat"
+        elif (parent / "python.sh").exists():
+            python_exe = parent / "python.sh"
+
+        if python_exe and (parent / "apps").exists():
+            return parent, python_exe
+
+    raise RuntimeError(
+        "Failed to locate Isaac Sim root directory.\n"
+        "Please ensure this script is located in the extension directory.\n"
+        "The Isaac Sim root directory must contain the 'apps' folder and 'python.bat' or 'python.sh'."
     )
-    return parser.parse_args()
 
 
-def find_omniverse_root(start_path):
-    current = start_path
-    for _ in range(10):
-        apps_dir = os.path.join(current, "apps")
-        if os.path.isdir(apps_dir):
-            return current
-        parent = os.path.dirname(current)
-        if parent == current:
-            break
-        current = parent
-    raise FileNotFoundError("无法找到 Omniverse 根目录（未发现 'apps' 目录）")
-
-
-def detect_platform():
-    system = platform.system().lower()
-    if system == "windows":
-        return "windows"
-    elif system == "linux":
-        return "linux"
-    elif system == "darwin":
-        return "macos"
-    else:
-        raise OSError(f"不支持的操作系统: {system}")
-
-
-def install_dependencies():
-    if not os.path.exists(REQUIREMENTS_FILE):
-        print(f"未找到 '{REQUIREMENTS_FILE}'，跳过用户依赖安装。")
+def install_dependencies(requirements_file):
+    """Install dependencies using Isaac Sim's built-in Python"""
+    if not requirements_file.exists():
+        print("No requirements.txt found. Skipping dependency installation.")
         return
 
-    print("正在安装用户依赖...")
+    print(f"Installing Python dependencies from: {requirements_file}")
     try:
         subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "-r", REQUIREMENTS_FILE]
+            [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)]
         )
-        print("用户依赖安装成功！")
+        print("Dependencies installed successfully.")
     except subprocess.CalledProcessError as e:
-        print(f"用户依赖安装失败！错误: {e}")
-        sys.exit(1)
+        print(f"Failed to install dependencies: {e}")
+        raise
 
 
-def modify_kit_file():
-    print(f"正在修改 .kit 文件: {KIT_FILE}")
+def modify_kit_file(kit_path):
+    """Modify .kit file (TOML format) and preserve original formatting"""
+    try:
+        import tomlkit
+    except ImportError:
+        print("tomlkit not found. Installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "tomlkit"])
+        import tomlkit
+
+    if not kit_path.exists():
+        print(f"Config file not found, skipping: {kit_path}")
+        return
+
+    print(f"Modifying: {kit_path.name}")
 
     try:
-        with open(KIT_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+        with open(kit_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            doc = tomlkit.parse(content)
 
-        # 创建备份
-        backup_path = KIT_FILE + ".backup"
-        if not os.path.exists(backup_path):
-            shutil.copy(KIT_FILE, backup_path)
-            print(f"已创建备份: {backup_path}")
+        modified = False
 
-        dependencies_start = -1
-        insert_index = -1  # 实际插入位置（最后一个有效行之后）
-        in_dependencies = False
+        # 1. [dependencies]
+        if "dependencies" not in doc:
+            doc["dependencies"] = tomlkit.table()
+            print("  Created [dependencies]")
 
-        for i, line in enumerate(lines):
-            stripped = line.strip()
+        deps = doc["dependencies"]
+        ext_name = "extwin.synthesis_explorer"
+        if ext_name not in deps:
+            deps[ext_name] = tomlkit.inline_table()
+            print(f"  Added dependency: {ext_name}")
+            modified = True
+        else:
+            print(f"  Dependency already exists: {ext_name}")
 
-            if stripped == "[dependencies]":
-                dependencies_start = i
-                in_dependencies = True
-                insert_index = i + 1  # 默认插入到段开始后
-                continue
+        # # 2. [settings.app.exts.folders] '++'
+        # try:
+        #     node = doc
+        #     for key in ["settings", "app", "exts", "folders"]:
+        #         if key not in node:
+        #             node[key] = tomlkit.table()
+        #         node = node[key]
 
-            if in_dependencies:
-                # 遇到下一个段，结束 dependencies 段
-                if (
-                    stripped.startswith("[")
-                    and stripped.endswith("]")
-                    and stripped != "[dependencies]"
-                ):
-                    break
+        #     if "++" not in node:
+        #         node["++"] = tomlkit.array()
+        #         node["++"].append("${app}/../extwin")
+        #         print("  Created '++' and added '${app}/../extwin'")
+        #         modified = True
+        #     elif "${app}/../extwin" not in node["++"]:
+        #         node["++"].append("${app}/../extwin")
+        #         print("  Added to '++': ${app}/../extwin")
+        #         modified = True
+        #     else:
+        #         print("  '${app}/../extwin' already in '++'")
+        # except Exception as e:
+        #     print(f"Warning: Failed to update exts.folders: {e}")
 
-                # 跳过注释和空行
-                if stripped and not stripped.startswith("#"):
-                    # 检查是否已包含该扩展（忽略引号和版本）
-                    if re.search(rf'["\']?{re.escape(NEW_DEPENDENCY_KEY)}["\']?', line):
-                        print(
-                            f"[dependencies] 中已存在 {NEW_DEPENDENCY_KEY}，无需添加。"
-                        )
-                        return
-
-                # 更新插入位置为当前行之后（保证插入到最后一个非空/非注释行之后）
-                if stripped:
-                    insert_index = i + 1
-
-        if dependencies_start == -1:
-            print(f"错误: 未找到 [dependencies] 段")
-            sys.exit(1)
-
-        # 插入新依赖
-        new_line = f'"{NEW_DEPENDENCY_KEY}" = {{}}\n'
-        lines.insert(insert_index, new_line)
-
-        with open(KIT_FILE, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-
-        print(f"已在 [dependencies] 添加: {NEW_DEPENDENCY_KEY}")
-        print(f"文件已更新: {KIT_FILE}")
+        # 3. Save with backup
+        if modified:
+            backup = kit_path.with_suffix(kit_path.suffix + ".bak")
+            if not backup.exists():
+                shutil.copy2(kit_path, backup)
+                print(f"  Backup saved: {backup.name}")
+            with open(kit_path, "w", encoding="utf-8") as f:
+                f.write(tomlkit.dumps(doc))
+            print(f"  Updated: {kit_path.name}")
+        else:
+            print(f"  No changes needed: {kit_path.name}")
 
     except Exception as e:
-        print(f"修改文件失败: {e}")
-        sys.exit(1)
+        print(f"Error modifying {kit_path}: {e}")
+        raise
 
 
-# ------------------ 配置 ------------------
-args = parse_args()
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REQUIREMENTS_FILE = os.path.join(SCRIPT_DIR, args.requirements)
+def copy_extension(extension_dir, isaac_root):
+    """Copy extension to extsUser/<extension_name>, ignoring hidden files"""
+    extwin_dir = isaac_root / "extsUser"
+    target_dir = extwin_dir / extension_dir.name
 
-# .kit 文件路径（优先使用参数，否则自动查找）
-KIT_FILE = args.kit
-if not KIT_FILE:
-    try:
-        OMNIVERSE_ROOT = find_omniverse_root(SCRIPT_DIR)
-        # 尝试多个常见 .kit 文件
-        possible_kits = [
-            "apps/isaacsim.exp.base.kit",
-        ]
-        for rel_path in possible_kits:
-            candidate = os.path.join(OMNIVERSE_ROOT, rel_path)
-            if os.path.isfile(candidate):
-                KIT_FILE = candidate
-                print(f"自动发现 .kit 文件: {KIT_FILE}")
-                break
-        if not KIT_FILE:
-            raise FileNotFoundError("未找到任何可用的 .kit 文件")
-    except Exception as e:
-        print(f"自动查找 .kit 文件失败: {e}")
-        sys.exit(1)
-else:
-    KIT_FILE = os.path.abspath(KIT_FILE)
-    if not os.path.isfile(KIT_FILE):
-        print(f"错误: 指定的 .kit 文件不存在: {KIT_FILE}")
-        sys.exit(1)
+    # Remove existing version
+    if target_dir.exists():
+        print(f"Removing existing extension: {target_dir}")
+        shutil.rmtree(target_dir)
 
-# 扩展名
-NEW_DEPENDENCY_KEY = args.ext or "extwin.synthesis_explorer"
+    extwin_dir.mkdir(exist_ok=True)
 
-# ------------------------------------------
+    def ignore_hidden(directory, filenames):
+        # Ignore files and directories starting with '.'
+        return [f for f in filenames if f.startswith(".")]
+
+    print(f"Copying extension to: {target_dir}")
+    shutil.copytree(extension_dir, target_dir, ignore=ignore_hidden)
+    print("Extension copied successfully.")
 
 
 def main():
-    print("开始 Omniverse 扩展安装...")
-    platform_name = detect_platform()
-    print(f"平台: {platform_name}")
-    print(f"脚本路径: {SCRIPT_DIR}")
+    print("=" * 60)
+    print("       Isaac Sim Extension Installer")
+    print("       Supports: Windows, Linux, macOS")
+    print("=" * 60)
 
-    install_dependencies()
-    modify_kit_file()
+    try:
+        # 1. Find Isaac Sim root
+        isaac_root, _ = find_isaac_sim_root()
+        print(f"Isaac Sim root directory: {isaac_root}")
 
-    print("\n安装完成！请启动 Omniverse 应用。")
+        # 2. Get extension directory
+        extension_dir = Path(__file__).parent.resolve()
+        print(f"Extension directory: {extension_dir}")
 
+        # 3. Install dependencies
+        req_file = extension_dir / "requirements.txt"
+        install_dependencies(req_file)
+
+        # 4. Modify .kit files
+        apps_dir = isaac_root / "apps"
+        kit_files = list(apps_dir.glob("isaacsim.exp.base.kit"))
+        if not kit_files:
+            print(f"No .kit files found in: {apps_dir}")
+        else:
+            for kit_file in kit_files:
+                modify_kit_file(kit_file)
+
+        # 5. Copy extension
+        copy_extension(extension_dir, isaac_root)
+
+        # 6. Check xclip on Linux
+        if platform.system() == "Linux":
+            if shutil.which("xclip") is None:
+                print("\n" + "="*60)
+                print("WARNING: 'xclip' utility not found")
+                print("="*60)
+                print("The 'xclip' tool is required for full clipboard functionality in Isaac Sim,")
+                print("such as copying text from the UI or external applications.")
+                print("\nWithout it, clipboard operations may not work correctly.")
+                print("\nPlease install 'xclip' using your distribution's package manager:")
+                print("  • Ubuntu/Debian: sudo apt update && sudo apt install xclip")
+                print("  • CentOS/RHEL/Fedora: sudo yum install xclip   OR   sudo dnf install xclip")
+                print("  • openSUSE: sudo zypper install xclip")
+                print("  • Arch Linux: sudo pacman -S xclip")
+                print("\nTip: After installation, verify with: 'xclip -version'")
+                print("="*60 + "\n")
+
+        print("\nInstallation completed successfully!")
+        print("\nPlease open the extension window, search for the extwin.synthesis_explorer extension, and enable it.")
+        print("\nBackup files have been created for modified .kit files (.kit.bak)")
+
+    except Exception as e:
+        print(f"\nInstallation failed: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

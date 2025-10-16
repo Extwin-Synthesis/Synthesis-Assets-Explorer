@@ -13,7 +13,6 @@ icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
-"omni.kit.uiapp" = {}
 
 [[python.module]]
 name = "extwin.synthesis"
