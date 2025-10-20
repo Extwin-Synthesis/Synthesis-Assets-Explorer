@@ -33,13 +33,14 @@ BASE_URL3 = "https://synthesis.extwin.com"
 # Asset type definitions for browsing
 ASSET_TYPES: list = [
     {
-        "Id": "Sim Ready",
+        "Id": "SimReady",
         "Name": "Sim Ready",
         "CategoryListUrl": f"{BASE_URL1}/api/SimReady/GetCategoryList",
         "CategoryItemContentUrl": f"{BASE_URL1}/api/SimReady/GetSimReadyList",
         "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetCategoryList",
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetSimReadyList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/SimReady/Image",
+        "TypeInBrowser": "assets-simready",
     },
     {
         "Id": "Model",
@@ -49,6 +50,7 @@ ASSET_TYPES: list = [
         "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetModelCategoryList",
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetModelList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Model/Image",
+        "TypeInBrowser": "assets-model",
     },
     {
         "Id": "_3dGS",
@@ -58,6 +60,7 @@ ASSET_TYPES: list = [
         "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetGsCategoryList",
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetGsList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Gs/Image",
+        "TypeInBrowser": "assets-gs",
     },
     {
         "Id": "Robot",
@@ -67,6 +70,7 @@ ASSET_TYPES: list = [
         "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetRobotCategoryList",
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetRobotList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Robot/Image",
+        "TypeInBrowser": "assets-ontology",
     },
     {
         "Id": "Scene",
@@ -76,6 +80,7 @@ ASSET_TYPES: list = [
         "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetSceneCategoryList",
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetSceneList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Scene/Image",
+        "TypeInBrowser": "assets-scene",
     },
 ]
 
@@ -307,10 +312,10 @@ class SynthesisAssetsWindow(ui.Window):
         self._login_widgets = {}
 
         # State
-        self._selected_asset_type_id = ASSET_TYPES[0].get("Id")
+        self._asset_type_id_selected = ASSET_TYPES[0].get("Id")
         self._selected_visibility_tab_id = VISIBILITY_TABS[0].get("Id")
         self._is_system_admin = False
-        self._currently_selected_asset_data: Optional[Dict[str, Any]] = None
+        self._asset_data_selected: Optional[Dict[str, Any]] = None
 
         # UI Frames and Components
         self._category_view_frame: Optional[ui.Frame] = None
@@ -340,7 +345,7 @@ class SynthesisAssetsWindow(ui.Window):
         self._tree_panel_initial_width = CATEGORY_TREE_DEFAULT_WIDTH
 
         # Asset Grid State - Enhanced for lazy loading
-        self._current_category_id = None
+        self._asset_category_id_selected = None
         self._all_loaded_asset_items: List[Dict[str, Any]] = (
             []
         )  # Store all loaded items locally
@@ -391,8 +396,8 @@ class SynthesisAssetsWindow(ui.Window):
 
     def _on_asset_type_click(self, asset_type: Dict[str, Any]):
         """Handles click on an asset type button."""
-        self._selected_asset_type_id = asset_type.get("Id")
-        self._current_category_id = None
+        self._asset_type_id_selected = asset_type.get("Id")
+        self._asset_category_id_selected = None
         self._reset_pagination_state(True)
         asyncio.ensure_future(self._delayed_rebuild_main_view())
 
@@ -454,9 +459,9 @@ class SynthesisAssetsWindow(ui.Window):
                                 asset_type_item.get("Name"),
                                 height=self._btn_size,
                                 selected=asset_type_item.get("Id")
-                                == self._selected_asset_type_id,
+                                == self._asset_type_id_selected,
                                 checked=asset_type_item.get("Id")
-                                == self._selected_asset_type_id,
+                                == self._asset_type_id_selected,
                                 clicked_fn=lambda a_type=asset_type_item: self._on_asset_type_click(
                                     a_type
                                 ),
@@ -592,8 +597,8 @@ class SynthesisAssetsWindow(ui.Window):
 
     def _handle_logout(self):
         """Handles logout by clearing app state and rebuilding UI."""
-        self._current_category_id = None
-        self._selected_asset_type_id = ASSET_TYPES[0].get("Id")
+        self._asset_category_id_selected = None
+        self._asset_type_id_selected = ASSET_TYPES[0].get("Id")
         self._reset_pagination_state(True)
         APP_STATE.logout()
         asyncio.ensure_future(self._delayed_logout_rebuild())
@@ -633,9 +638,20 @@ class SynthesisAssetsWindow(ui.Window):
         """Handles the 'Open In Browser' button click event."""
         import webbrowser
 
-        webbrowser.open(
-            BASE_URL3
-        )  # todo generate url with asset type and asset selected
+        selected_asset_type = next(
+            (
+                item
+                for item in ASSET_TYPES
+                if item["Id"] == self._asset_type_id_selected
+            ),
+            None,
+        )
+        if not selected_asset_type:
+            carb.log_error("Invalid asset type selection.")
+            return
+
+        _final_url_to_open = f'{BASE_URL3}/#/home?id={self._asset_data_selected.get("Id","")}&t={selected_asset_type.get("TypeInBrowser","")}'
+        webbrowser.open(_final_url_to_open)
 
     def _handle_setting(self):
         """Handles the settings button click event."""
@@ -760,9 +776,9 @@ class SynthesisAssetsWindow(ui.Window):
 
             # Trigger loading the first page with the new keyword
             # Only if a category is selected (including 'All')
-            if self._current_category_id is not None:
+            if self._asset_category_id_selected is not None:
                 await self._load_assets_for_category(
-                    self._current_category_id, page_index=1
+                    self._asset_category_id_selected, page_index=1
                 )
             else:
                 carb.log_info(
@@ -889,27 +905,28 @@ class SynthesisAssetsWindow(ui.Window):
 
         with self._detail_panel_frame:
             if asset_data:
+                _asset_type_id = self._asset_type_id_selected
                 with ui.HStack():
                     ui.Spacer(width=14)
                     with ui.VStack(
                         spacing=0,
                         style={"color": cl("#ffffffff")},
                     ):
-                        ui.Image(
-                            img_url,
-                            height=300,
-                            fill_policy=ui.FillPolicy.PRESERVE_ASPECT_FIT,
-                            style={"border_radius": 4},
-                        )
-                        with ui.HStack(height=0):
-                            ui.Label(
-                                asset_data.get("Name", "Unnamed"),
-                                alignment=ui.Alignment.RIGHT_CENTER,
-                                word_wrap=True,
-                                width=ui.Percent(50),
-                                height=24,
+                        ui.Spacer(height=self._gap)
+                        with ui.HStack(height=0, spacing=self._gap):
+                            if _asset_type_id == "Scene":
+                                ui.Button(
+                                    "Load",
+                                    width=100,
+                                    height=self._btn_size,
+                                    clicked_fn=self._load_scene,
+                                )
+                            ui.Button(
+                                "View In Browser",
+                                width=120,
+                                height=self._btn_size,
+                                clicked_fn=self._handle_open_in_browser,
                             )
-                            ui.Spacer(width=self._gap)
                             ui.Button(
                                 "Copy Name",
                                 width=80,
@@ -918,9 +935,21 @@ class SynthesisAssetsWindow(ui.Window):
                                     asset_data.get("Name")
                                 ),
                             )
+
+                        ui.Image(
+                            img_url,
+                            height=300,
+                            fill_policy=ui.FillPolicy.PRESERVE_ASPECT_FIT,
+                            style={"border_radius": 4},
+                        )
+                        ui.Label(
+                            asset_data.get("Name", "Unnamed"),
+                            alignment=ui.Alignment.CENTER,
+                            word_wrap=True,
+                            height=0,
+                        )
                         ui.Spacer(height=self._gap)
 
-                        _asset_type_id = self._selected_asset_type_id
                         with ui.CollapsableFrame("Asset Info"):
                             with ui.VStack(spacing=self._gap * 2):
                                 if (
@@ -942,26 +971,6 @@ class SynthesisAssetsWindow(ui.Window):
                                         _checkbox.model.set_value(
                                             asset_data.get("IsHasArticulus", False)
                                         )
-                                        ui.Spacer(width=self._gap)
-                                        ui.Button(
-                                            "View In Browser",
-                                            width=120,
-                                            height=self._btn_size,
-                                            clicked_fn=self._handle_open_in_browser,
-                                        )
-
-                                if (
-                                    _asset_type_id != "SimReady"
-                                    and _asset_type_id != "Robot"
-                                ):
-                                    with ui.HStack(height=0):
-                                        ui.Spacer(width=self._gap)
-                                        ui.Button(
-                                            "View In Browser",
-                                            width=120,
-                                            height=self._btn_size,
-                                            clicked_fn=self._handle_open_in_browser,
-                                        )
 
                                 if _asset_type_id != "Scene":
                                     with ui.HStack(height=0):
@@ -969,16 +978,6 @@ class SynthesisAssetsWindow(ui.Window):
                                         ui.Label("Description:", width=0)
                                         ui.Spacer(width=self._gap)
                                         ui.Label(asset_data.get("Comment"))
-
-                                if _asset_type_id == "Scene":
-                                    with ui.HStack(height=0):
-                                        ui.Spacer(width=self._gap)
-                                        ui.Button(
-                                            "Load",
-                                            width=100,
-                                            height=self._btn_size,
-                                            clicked_fn=self._load_scene,
-                                        )
 
             else:
                 ui.Label(
@@ -990,7 +989,7 @@ class SynthesisAssetsWindow(ui.Window):
         """
         Handles loading a selected scene asset.
         """
-        if not self._currently_selected_asset_data:
+        if not self._asset_data_selected:
             nm.post_notification(
                 "No scene selected to load.",
                 duration=2.0,
@@ -999,7 +998,7 @@ class SynthesisAssetsWindow(ui.Window):
             carb.log_warn("Load Scene called, but no asset is selected.")
             return
 
-        scene_id = self._currently_selected_asset_data.get("Id")
+        scene_id = self._asset_data_selected.get("Id")
         if not scene_id:
             nm.post_notification(
                 "Selected scene data is invalid.",
@@ -1035,7 +1034,7 @@ class SynthesisAssetsWindow(ui.Window):
             asyncio.ensure_future(_async_load())
 
         async def _async_load():
-            _scene_name = self._currently_selected_asset_data.get('Name','')
+            _scene_name = self._asset_data_selected.get("Name", "")
             nm.post_notification(
                 f"Loading scene {_scene_name} ...",
                 duration=1.0,
@@ -1102,7 +1101,7 @@ class SynthesisAssetsWindow(ui.Window):
             (
                 item
                 for item in ASSET_TYPES
-                if item["Id"] == self._selected_asset_type_id
+                if item["Id"] == self._asset_type_id_selected
             ),
             None,
         )
@@ -1173,14 +1172,14 @@ class SynthesisAssetsWindow(ui.Window):
         if selected_item:
             category_id = selected_item.category_id
             # Prevent redundant loading if the same category is selected again
-            if self._current_category_id == category_id:
+            if self._asset_category_id_selected == category_id:
                 carb.log_info(
                     f"Category {category_id} is already loaded or loading (via selection)."
                 )
                 return
 
             # Reset state for new category selection
-            self._current_category_id = category_id
+            self._asset_category_id_selected = category_id
             self._reset_pagination_state(True)
 
             # Clear grid and show initial loading indicator
@@ -1205,7 +1204,7 @@ class SynthesisAssetsWindow(ui.Window):
             self._reset_pagination_state(True)
             self._build_asset_grid([], "")  # Clear grid
             self._build_detail_panel(None, None)  # Clear detail
-            self._currently_selected_asset_data = None
+            self._asset_data_selected = None
 
     def _reset_pagination_state(self, clear_all_local_data: bool = False):
         """
@@ -1347,7 +1346,7 @@ class SynthesisAssetsWindow(ui.Window):
             (
                 item
                 for item in ASSET_TYPES
-                if item["Id"] == self._selected_asset_type_id
+                if item["Id"] == self._asset_type_id_selected
             ),
             None,
         )
@@ -1355,7 +1354,7 @@ class SynthesisAssetsWindow(ui.Window):
         if not selected_asset_type or not selected_asset_type.get(
             "CategoryItemContentUrl"
         ):
-            error_msg = f"Config error for {self._selected_asset_type_id}"
+            error_msg = f"Config error for {self._asset_type_id_selected}"
             carb.log_error(error_msg)
             self._update_grid_with_error(error_msg)
             self._is_loading_more = False
@@ -1408,7 +1407,7 @@ class SynthesisAssetsWindow(ui.Window):
 
             processed_items = []
             if isinstance(raw_data_list, List):
-                _asset_type_id = self._selected_asset_type_id
+                _asset_type_id = self._asset_type_id_selected
                 if _asset_type_id == "Scene" or _asset_type_id == "_3dGS":
                     processed_items = raw_data_list
                 else:  # Simready,Model,Robot
@@ -1494,7 +1493,7 @@ class SynthesisAssetsWindow(ui.Window):
             not self._is_loading_more
             and not self._no_more_assets_to_load
             and self._current_page_index < self._total_pages_from_api
-            and self._current_category_id is not None
+            and self._asset_category_id_selected is not None
         ):
 
             carb.log_info(
@@ -1502,7 +1501,7 @@ class SynthesisAssetsWindow(ui.Window):
             )
             next_page = self._current_page_index + 1
             await self._load_assets_for_category(
-                self._current_category_id, page_index=next_page
+                self._asset_category_id_selected, page_index=next_page
             )
 
     def _clear_and_build_asset_grid(self, asset_items: list, thumbnail_api_url: str):
@@ -1513,7 +1512,7 @@ class SynthesisAssetsWindow(ui.Window):
 
         self._grid_panel_frame.clear()
         self._currently_selected_image_widget = None
-        self._currently_selected_asset_data = None
+        self._asset_data_selected = None
         self._build_detail_panel(None, None)
         self._grid_vgrid_container = None  # Reset container ref on full clear
         self._grid_rendered_count = 0  # Reset rendered count
@@ -1585,7 +1584,7 @@ class SynthesisAssetsWindow(ui.Window):
                     image_widget.set_style(IMAGE_STYLE_SELECTED)
                     self._currently_selected_image_widget = image_widget
 
-                    self._currently_selected_asset_data = data
+                    self._asset_data_selected = data
                     # The image URL needs to be passed to the detail panel
                     # It's either the thumbnail URL or the empty image path
                     img_url = (
@@ -1620,12 +1619,13 @@ class SynthesisAssetsWindow(ui.Window):
                         make_on_image_pressed(_thumbnail, item_data)
                     )
 
-                    if self._selected_asset_type_id != "Scene":
+                    if self._asset_type_id_selected != "Scene":
                         _thumbnail.set_drag_fn(
                             lambda _data=item_data, _url=_final_thumbnail_url: self._get_asset_usd_path(
                                 _data, _url
                             )
                         )
+                        _thumbnail.set_tooltip("Drag and place")
 
                     ui.Label(
                         item_name,
@@ -1640,7 +1640,7 @@ class SynthesisAssetsWindow(ui.Window):
     ):  # Renamed parameter for clarity
         """Callback for drag-and-drop, returns the USD path for an asset."""
         _asset_name = data.get("Name", "Unnamed")
-        _asset_type_id = self._selected_asset_type_id
+        _asset_type_id = self._asset_type_id_selected
         _has_usd_file = data.get("IsHasUsdFile", False)
 
         if not _has_usd_file:

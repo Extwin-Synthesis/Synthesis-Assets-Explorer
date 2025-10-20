@@ -15,7 +15,7 @@ def get_style():
         "color": cl("#333333ff"),
         "margin_width": 0,
         "margin_height": 0,
-        "padding": 0,
+        "padding": 6,
         "border_width": 0,
         "border_radius": BORDER_RADIUS,
         "border_color": cl("#000000FF"),
