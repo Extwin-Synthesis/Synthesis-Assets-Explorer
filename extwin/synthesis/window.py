@@ -41,6 +41,7 @@ ASSET_TYPES: list = [
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetSimReadyList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/SimReady/Image",
         "TypeInBrowser": "assets-simready",
+        "ModelBusinessType": 1,
     },
     {
         "Id": "Model",
@@ -51,6 +52,7 @@ ASSET_TYPES: list = [
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetModelList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Model/Image",
         "TypeInBrowser": "assets-model",
+        "ModelBusinessType": 2,
     },
     {
         "Id": "_3dGS",
@@ -61,6 +63,7 @@ ASSET_TYPES: list = [
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetGsList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Gs/Image",
         "TypeInBrowser": "assets-gs",
+        "ModelBusinessType": 3,
     },
     {
         "Id": "Robot",
@@ -71,6 +74,7 @@ ASSET_TYPES: list = [
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetRobotList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Robot/Image",
         "TypeInBrowser": "assets-ontology",
+        "ModelBusinessType": 5,
     },
     {
         "Id": "Scene",
@@ -81,6 +85,7 @@ ASSET_TYPES: list = [
         "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetSceneList",
         "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Scene/Image",
         "TypeInBrowser": "assets-scene",
+        "ModelBusinessType": 6,
     },
 ]
 
@@ -935,6 +940,22 @@ class SynthesisAssetsWindow(ui.Window):
                                     asset_data.get("Name")
                                 ),
                             )
+                            if (
+                                _asset_type_id == "SimReady"
+                                or _asset_type_id == "Robot"
+                            ):
+                                with ui.HStack(height=24, spacing=0):
+                                    ui.Label("Articulated:", width=0, height=24)
+                                    _checkbox = ui.CheckBox(
+                                        style={
+                                            "color": cl.green,
+                                            "margin": self._gap,
+                                        },
+                                        enabled=False,
+                                    )
+                                    _checkbox.model.set_value(
+                                        asset_data.get("IsHasArticulus", False)
+                                    )
 
                         ui.Image(
                             img_url,
@@ -952,32 +973,15 @@ class SynthesisAssetsWindow(ui.Window):
 
                         with ui.CollapsableFrame("Asset Info"):
                             with ui.VStack(spacing=self._gap * 2):
-                                if (
-                                    _asset_type_id == "SimReady"
-                                    or _asset_type_id == "Robot"
-                                ):
-                                    with ui.HStack(height=0, spacing=0):
-                                        ui.Spacer(width=self._gap)
-                                        ui.Label("Joint:", width=0)
-                                        ui.Spacer(width=self._gap)
-                                        _checkbox = ui.CheckBox(
-                                            width=24,
-                                            style={
-                                                "color": cl.green,
-                                                "margin": self._gap,
-                                            },
-                                            enabled=False,
-                                        )
-                                        _checkbox.model.set_value(
-                                            asset_data.get("IsHasArticulus", False)
-                                        )
-
                                 if _asset_type_id != "Scene":
-                                    with ui.HStack(height=0):
+                                    with ui.HStack():
                                         ui.Spacer(width=self._gap)
-                                        ui.Label("Description:", width=0)
+                                        ui.Label("Description:", width=0, height=0)
                                         ui.Spacer(width=self._gap)
-                                        ui.Label(asset_data.get("Comment"))
+                                        ui.Label(
+                                            asset_data.get("Comment"),
+                                            alignment=ui.Alignment.TOP,
+                                        )
 
             else:
                 ui.Label(
@@ -1662,6 +1666,7 @@ class SynthesisAssetsWindow(ui.Window):
 
         if _asset_type_id == "_3dGS":
             if data and data.get("Id"):
+                asyncio.ensure_future(self._log_asset_load_record(data))
                 return f"{BASE_URL1}/api/Usd/UsdzFile/{data['Id']}.usdz"
             else:
                 return ""
@@ -1669,6 +1674,7 @@ class SynthesisAssetsWindow(ui.Window):
             if data:
                 _usd_path = data.get("UsdCurrentPath", None)
                 if isinstance(_usd_path, list) and len(_usd_path) > 0:
+                    asyncio.ensure_future(self._log_asset_load_record(data))
                     # Ensure path starts with a single slash
                     path_part = _usd_path[0].replace("//", "/").lstrip("/")
                     return f"{BASE_URL2}/{path_part}"
@@ -1676,6 +1682,26 @@ class SynthesisAssetsWindow(ui.Window):
                     return ""
             else:
                 return ""
+
+    async def _log_asset_load_record(self, data: dict):
+        selected_asset_type = next(
+            (
+                item
+                for item in ASSET_TYPES
+                if item["Id"] == self._asset_type_id_selected
+            ),
+            None,
+        )
+        if not selected_asset_type:
+            return
+        _data = {
+            "RelationObjectId": data.get("Id", ""),
+            "UserName": "Free Extension User",
+            "ModelBusinessType": selected_asset_type.get("ModelBusinessType", ""),
+        }
+        await DATA_MANAGER.log_asset_load_record(
+            f"{BASE_URL1}/api/Global/AddLoadRecord", _data
+        )
 
     def _update_grid_with_error(self, error_message: str):
         """Helper to update the asset grid frame with an error message."""

@@ -3,34 +3,41 @@ from typing import Optional, Dict, Any, List, Union
 import aiohttp
 from aiohttp.client import _RequestOptions
 import carb
-import threading # Import threading for synchronous lock
+import threading  # Import threading for synchronous lock
 from .app_state import APP_STATE
 
 # --- Constants ---
 HTTP_SUCCESS = 200
-BUSINESS_SUCCESS = 200 # Standard success code for the main backend API
+BUSINESS_SUCCESS = 200  # Standard success code for the main backend API
 
 
 # --- Custom Exception Classes ---
 class DataManagerError(Exception):
     """Base exception for DataManager errors."""
+
     pass
+
 
 class HTTPException(DataManagerError):
     """Raised when an HTTP request fails."""
+
     pass
+
 
 class BusinessLogicException(DataManagerError):
     """Raised when the main backend API returns a known business logic error."""
+
     pass
+
 
 class DataParsingException(DataManagerError):
     """Raised when response data cannot be parsed."""
+
     pass
 
 
 # --- Singleton Instance ---
-DATA_MANAGER: Optional['DataManager'] = None
+DATA_MANAGER: Optional["DataManager"] = None
 
 
 class DataManager:
@@ -43,10 +50,10 @@ class DataManager:
       with potentially different protocols or response formats.
     """
 
-    _instance: Optional['DataManager'] = None
+    _instance: Optional["DataManager"] = None
     # Use threading.Lock for protecting synchronous __new__ (only if needed)
     _init_lock = threading.Lock()
-    _session_lock = asyncio.Lock() # Use asyncio.Lock for async session access
+    _session_lock = asyncio.Lock()  # Use asyncio.Lock for async session access
 
     def __new__(cls, *args, **kwargs):
         """Ensures only one instance of DataManager is created (Thread-safe)."""
@@ -55,7 +62,7 @@ class DataManager:
             return cls._instance
 
         # Instance is None or might be in the process of being created.
-        with cls._init_lock: # threading.Lock supports 'with'
+        with cls._init_lock:  # threading.Lock supports 'with'
             # Double-check pattern
             if cls._instance is None:
                 cls._instance = super(DataManager, cls).__new__(cls)
@@ -63,8 +70,8 @@ class DataManager:
 
     def __init__(self):
         """Initializes the DataManager instance."""
-        if hasattr(self, '_initialized_flag'):
-            return # Already initialized
+        if hasattr(self, "_initialized_flag"):
+            return  # Already initialized
 
         self.session: Optional[aiohttp.ClientSession] = None
         self._initialized_flag = True
@@ -85,7 +92,9 @@ class DataManager:
         """Gets or creates the shared aiohttp ClientSession, ensuring async safety."""
         async with self._session_lock:
             if self.session is None or self.session.closed:
-                carb.log_info("[DataManager] Creating new shared aiohttp ClientSession.")
+                carb.log_info(
+                    "[DataManager] Creating new shared aiohttp ClientSession."
+                )
                 timeout = aiohttp.ClientTimeout(total=60 * 2)
                 self.session = aiohttp.ClientSession(timeout=timeout)
             return self.session
@@ -99,7 +108,11 @@ class DataManager:
                 carb.log_info("[DataManager] Shared client session closed.")
 
     async def _request(
-        self, method: str, path: str, check_business_status: bool = True, **kwargs: Union[_RequestOptions, Dict[str, Any]]
+        self,
+        method: str,
+        path: str,
+        check_business_status: bool = True,
+        **kwargs: Union[_RequestOptions, Dict[str, Any]],
     ) -> Any:
         """Sends an HTTP request to the main backend API endpoints."""
         session = await self._get_session()
@@ -107,32 +120,53 @@ class DataManager:
         headers["Token"] = APP_STATE.token or ""
 
         try:
-            carb.log_info(f"[DataManager] Sending {method} request to main API: {path}") # Changed from log_debug
-            async with session.request(method, path, headers=headers, **kwargs) as response:
-                carb.log_info(f"[DataManager] Received response for {method} {path}, status: {response.status}") # Changed from log_debug
+            carb.log_info(
+                f"[DataManager] Sending {method} request to main API: {path}"
+            )  # Changed from log_debug
+            async with session.request(
+                method, path, headers=headers, **kwargs
+            ) as response:
+                carb.log_info(
+                    f"[DataManager] Received response for {method} {path}, status: {response.status}"
+                )  # Changed from log_debug
 
                 if response.status != HTTP_SUCCESS:
                     error_text = await response.text()
-                    carb.log_error(f"[DataManager] Main API HTTP Error {response.status} for {method} {path}: {error_text}")
+                    carb.log_error(
+                        f"[DataManager] Main API HTTP Error {response.status} for {method} {path}: {error_text}"
+                    )
                     raise HTTPException(f"HTTP {response.status}: {error_text}")
 
                 try:
                     json_data = await response.json()
-                    carb.log_info(f"[DataManager] Parsed JSON response for {method} {path}") # Changed from log_debug
+                    carb.log_info(
+                        f"[DataManager] Parsed JSON response for {method} {path}"
+                    )  # Changed from log_debug
                 except aiohttp.ContentTypeError as e:
                     raw_text = await response.text()
-                    carb.log_error(f"[DataManager] Failed to parse JSON for {method} {path}. Content-Type: {response.content_type}, Body: {raw_text}")
-                    raise DataParsingException(f"Response is not valid JSON. Content-Type: {response.content_type}, Body: {raw_text}") from e
+                    carb.log_error(
+                        f"[DataManager] Failed to parse JSON for {method} {path}. Content-Type: {response.content_type}, Body: {raw_text}"
+                    )
+                    raise DataParsingException(
+                        f"Response is not valid JSON. Content-Type: {response.content_type}, Body: {raw_text}"
+                    ) from e
                 except Exception as e:
-                    carb.log_error(f"[DataManager] Unexpected error parsing JSON for {method} {path}: {e}")
-                    raise DataParsingException(f"Unexpected error parsing JSON: {e}") from e
+                    carb.log_error(
+                        f"[DataManager] Unexpected error parsing JSON for {method} {path}: {e}"
+                    )
+                    raise DataParsingException(
+                        f"Unexpected error parsing JSON: {e}"
+                    ) from e
 
                 if check_business_status:
                     error_code = json_data.get("ErrorCode", -1)
                     status_code = json_data.get("StatusCode", -1)
                     message = json_data.get("MessageCode", "Unknown error")
 
-                    if error_code != BUSINESS_SUCCESS or status_code != BUSINESS_SUCCESS:
+                    if (
+                        error_code != BUSINESS_SUCCESS
+                        or status_code != BUSINESS_SUCCESS
+                    ):
                         carb.log_error(
                             f"[DataManager] Main API Business Logic Error for {method} {path}: "
                             f"ErrorCode={error_code} StatusCode={status_code} Message='{message}'"
@@ -142,20 +176,28 @@ class DataManager:
                         )
 
                 result = json_data.get("Result", {})
-                carb.log_info(f"[DataManager] Main API request {method} {path} successful.") # Changed from log_debug
+                carb.log_info(
+                    f"[DataManager] Main API request {method} {path} successful."
+                )  # Changed from log_debug
                 return result
 
         except (HTTPException, BusinessLogicException, DataParsingException):
             raise
         except Exception as e:
-            carb.log_error(f"[DataManager] Unexpected error during main API {method} {path}: {str(e)}")
-            raise DataManagerError(f"Unexpected error during main API request to {method} {path}.") from e
+            carb.log_error(
+                f"[DataManager] Unexpected error during main API {method} {path}: {str(e)}"
+            )
+            raise DataManagerError(
+                f"Unexpected error during main API request to {method} {path}."
+            ) from e
 
     # --- Methods for Main Backend API Endpoints ---
 
     async def login(self, url: str, username: str, password: str) -> Dict[str, Any]:
         """Performs user login to the main backend API."""
-        return await self._request("POST", url, json={"LoginAccount": username, "LoginPwd": password})
+        return await self._request(
+            "POST", url, json={"LoginAccount": username, "LoginPwd": password}
+        )
 
     async def get_category_tree(self, path: str) -> List[Dict[str, Any]]:
         """Fetches category tree data from the main backend API."""
@@ -176,17 +218,25 @@ class DataManager:
         timeout = aiohttp.ClientTimeout(total=60)
         try:
             async with aiohttp.ClientSession(timeout=timeout) as temp_session:
-                carb.log_info(f"[DataManager] Querying USD path from other endpoint: {other_endpoint_url}")
+                carb.log_info(
+                    f"[DataManager] Querying USD path from other endpoint: {other_endpoint_url}"
+                )
                 async with temp_session.get(other_endpoint_url) as response:
-                    carb.log_info(f"[DataManager] Received response from other endpoint, status: {response.status}")
+                    carb.log_info(
+                        f"[DataManager] Received response from other endpoint, status: {response.status}"
+                    )
 
                     if response.status != HTTP_SUCCESS:
                         error_text = await response.text()
-                        carb.log_error(f"[DataManager] Other Endpoint HTTP Error {response.status}: {error_text}")
+                        carb.log_error(
+                            f"[DataManager] Other Endpoint HTTP Error {response.status}: {error_text}"
+                        )
                         return None
 
                     raw_text = await response.text()
-                    carb.log_info(f"[DataManager] Raw response text from other endpoint: {raw_text}") # Changed from log_debug
+                    carb.log_info(
+                        f"[DataManager] Raw response text from other endpoint: {raw_text}"
+                    )  # Changed from log_debug
 
                     try:
                         result = await response.json()
@@ -200,26 +250,35 @@ class DataManager:
                     if isinstance(result, list) and len(result) > 0:
                         usd_path = result[0]
                         if isinstance(usd_path, str) and usd_path:
-                            carb.log_info(f"[DataManager] USD path retrieved from other endpoint: {usd_path}")
+                            carb.log_info(
+                                f"[DataManager] USD path retrieved from other endpoint: {usd_path}"
+                            )
                             return usd_path
                         else:
-                            carb.log_warn(f"[DataManager] USD path query returned invalid/empty path at index 0: {usd_path}")
+                            carb.log_warn(
+                                f"[DataManager] USD path query returned invalid/empty path at index 0: {usd_path}"
+                            )
                             return None
                     else:
-                        carb.log_warn(f"[DataManager] USD path query returned empty list or non-list: {result}")
+                        carb.log_warn(
+                            f"[DataManager] USD path query returned empty list or non-list: {result}"
+                        )
                         return None
 
         except aiohttp.ClientError as e:
-            carb.log_error(f"[DataManager] Network error querying other endpoint {other_endpoint_url}: {e}")
+            carb.log_error(
+                f"[DataManager] Network error querying other endpoint {other_endpoint_url}: {e}"
+            )
             return None
         except Exception as e:
-            carb.log_error(f"[DataManager] Unexpected error querying other endpoint {other_endpoint_url}: {e}")
+            carb.log_error(
+                f"[DataManager] Unexpected error querying other endpoint {other_endpoint_url}: {e}"
+            )
             return None
+
+    async def log_asset_load_record(self, url, data: dict):
+        return await self._request("POST", url, json=data)
 
 
 # Create the global singleton instance
 DATA_MANAGER = DataManager()
-
-
-
-
