@@ -1389,6 +1389,7 @@ class SynthesisAssetsWindow(ui.Window):
             "Key": search_keyword,
             "DataType": _data_type,
         }
+        # print("params", params)
 
         carb.log_info(
             f"Loading assets for category '{category_id}', page {page_index}, with keyword '{search_keyword}'"
@@ -1412,17 +1413,26 @@ class SynthesisAssetsWindow(ui.Window):
             processed_items = []
             if isinstance(raw_data_list, List):
                 _asset_type_id = self._asset_type_id_selected
-                if _asset_type_id == "Scene" or _asset_type_id == "_3dGS":
+                if _asset_type_id == "Scene":
                     processed_items = raw_data_list
-                else:  # Simready,Model,Robot
+                elif _asset_type_id == "_3dGS":
                     processed_items = [
                         {
                             **x,
-                            "UsdCurrentPath": deserialize_path(
-                                x.get("UsdCurrentPath", ""), x.get("Name", "")
-                            ),
                         }
                         for x in raw_data_list
+                        if x.get("IsHasUsdFile") is True
+                    ]
+                else:  # Simready,Model,Robot
+                    processed_items = [
+                        {**x, "UsdCurrentPath": deserialized_path}
+                        for x in raw_data_list
+                        if (
+                            deserialized_path := deserialize_path(
+                                x.get("UsdCurrentPath", ""), x.get("Name", "")
+                            )
+                        )
+                        and x.get("IsHasUsdFile") is True
                     ]
 
             # Append newly loaded items to our local store
@@ -1557,6 +1567,7 @@ class SynthesisAssetsWindow(ui.Window):
         if not is_append or self._grid_vgrid_container is None:
             # Full replacement logic - essentially same as old _build_asset_grid but storing container ref
             self._clear_and_build_asset_grid(asset_items, thumbnail_api_url)
+            self._grid_rendered_count = len(asset_items)
             return
 
         # Otherwise, it's an append operation onto an existing grid
@@ -1564,6 +1575,7 @@ class SynthesisAssetsWindow(ui.Window):
         if self._grid_vgrid_container and len(asset_items) > 0:
             num_existing_rendered_items = self._grid_rendered_count
             new_items_to_render = asset_items[num_existing_rendered_items:]
+            # print("Appending", len(new_items_to_render), "new items to grid.")
 
             if new_items_to_render:
                 self._populate_grid_items_into_container(
@@ -1650,7 +1662,7 @@ class SynthesisAssetsWindow(ui.Window):
         if not _has_usd_file:
             nm.post_notification(
                 f"Asset '{_asset_name}' has no USD file available.",
-                duration=3.0,
+                duration=2.0,
                 status=nm.NotificationStatus.WARNING,
             )
             return ""
