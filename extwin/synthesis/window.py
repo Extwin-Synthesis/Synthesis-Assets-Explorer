@@ -6,8 +6,7 @@ from typing import List, Optional, Dict, Any
 import omni.ui as ui
 import omni.kit.app
 from .app_state import APP_STATE
-from .data_manager import DATA_MANAGER
-from .aes import encrypt_aes
+from .data_manager import DATA_MANAGER, ASSET_TYPES, BASE_URL1, BASE_URL2, BASE_URL3
 from .style import get_style
 import os
 import json
@@ -18,78 +17,18 @@ import omni.kit.window.file
 from .setting_modal import SettingModal
 from omni.kit.window.popup_dialog import MessageDialog
 from .util import on_copy_to_clipboard
+from aiohttp import web
+import base64
 
 # from .loading_fullscreen import FullScreenLoading
+
+from .tree_models import CategoryItem, CategoryModel, CategoryDelegate
 
 # --- Constants and Configuration ---
 EXT_PATH = os.path.dirname(__file__)
 GLOBAL_STYLE = get_style()
 
 ASSETS_EXPLORER_NAME = "Extwin Assets"
-BASE_URL1 = "https://synthesis-server.extwin.com"
-BASE_URL2 = "https://multiverse-server.vothing.com"
-BASE_URL3 = "https://synthesis.extwin.com"
-
-# Asset type definitions for browsing
-ASSET_TYPES: list = [
-    {
-        "Id": "SimReady",
-        "Name": "Sim Ready",
-        "CategoryListUrl": f"{BASE_URL1}/api/SimReady/GetCategoryList",
-        "CategoryItemContentUrl": f"{BASE_URL1}/api/SimReady/GetSimReadyList",
-        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetCategoryList",
-        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetSimReadyList",
-        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/SimReady/Image",
-        "TypeInBrowser": "assets-simready",
-        "ModelBusinessType": 1,
-    },
-    {
-        "Id": "Model",
-        "Name": "Model",
-        "CategoryListUrl": f"{BASE_URL1}/api/Model/GetCategoryList",
-        "CategoryItemContentUrl": f"{BASE_URL1}/api/Model/GetModelList",
-        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetModelCategoryList",
-        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetModelList",
-        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Model/Image",
-        "TypeInBrowser": "assets-model",
-        "ModelBusinessType": 2,
-    },
-    {
-        "Id": "_3dGS",
-        "Name": "3D Gauss Splatting",
-        "CategoryListUrl": f"{BASE_URL1}/api/Gs/GetCategoryList",
-        "CategoryItemContentUrl": f"{BASE_URL1}/api/Gs/GetGsList",
-        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetGsCategoryList",
-        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetGsList",
-        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Gs/Image",
-        "TypeInBrowser": "assets-gs",
-        "ModelBusinessType": 3,
-    },
-    {
-        "Id": "Robot",
-        "Name": "Robot",
-        "CategoryListUrl": f"{BASE_URL1}/api/Noumen/GetCategoryList",
-        "CategoryItemContentUrl": f"{BASE_URL1}/api/Robot/GetRobotList",
-        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetRobotCategoryList",
-        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetRobotList",
-        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Robot/Image",
-        "TypeInBrowser": "assets-ontology",
-        "ModelBusinessType": 5,
-    },
-    {
-        "Id": "Scene",
-        "Name": "Scene",
-        "CategoryListUrl": f"{BASE_URL1}/api/Scene/GetCategoryList",
-        "CategoryItemContentUrl": f"{BASE_URL1}/api/Scene/GetSceneList",
-        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetSceneCategoryList",
-        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetSceneList",
-        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Scene/Image",
-        "TypeInBrowser": "assets-scene",
-        "ModelBusinessType": 6,
-    },
-]
-
-LOGIN_URL = f"{BASE_URL1}/api/User/Login"
 
 VISIBILITY_TABS: list = [
     {"Id": "Public", "Name": "Public"},
@@ -119,185 +58,7 @@ IMAGE_STYLE_SELECTED = {
 
 IMAGE_EMPTY_PATH = os.path.join(EXT_PATH, "asset", "empty.png")
 
-
-# --- Data Models ---
-class CategoryItem(ui.AbstractItem):
-    """
-    Represents a category in the asset browser tree view.
-    """
-
-    def __init__(self, data: dict, parent: Optional["CategoryItem"] = None):
-        super().__init__()
-        self.data = data
-        self.parent = parent
-        self.children: List[CategoryItem] = []
-        self._value_models = [
-            ui.SimpleStringModel(self.data.get("CategoryName", "Unnamed"))
-        ]
-
-    def __repr__(self):
-        return f"CategoryItem({self.data.get('CategoryName')})"
-
-    @property
-    def category_id(self) -> Optional[str]:
-        return self.data.get("CategoryId")
-
-    @property
-    def name(self) -> str:
-        return self.data.get("CategoryName", "Unnamed")
-
-
-class CategoryModel(ui.AbstractItemModel):
-    """
-    Model for the category tree view, managing the hierarchical structure.
-    """
-
-    def __init__(self, category_list: list):
-        super().__init__()
-        self._root = CategoryItem(
-            {"CategoryName": "root", "CategoryId": "root"}, parent=None
-        )
-        self._build_tree(self._root, category_list)
-
-    def _build_tree(self, parent_item: CategoryItem, items: list):
-        """Recursively builds the tree from flat API data."""
-        for item_data in items:
-            child_item = CategoryItem(item_data, parent=parent_item)
-            parent_item.children.append(child_item)
-            sub_items = item_data.get("CategoryLists", [])
-            if sub_items:
-                self._build_tree(child_item, sub_items)
-
-    def get_item_children(
-        self, item: Optional[CategoryItem] = None
-    ) -> List[CategoryItem]:
-        """Gets children of an item (or root if None)."""
-        if item is None:
-            return self._root.children
-        return item.children
-
-    def get_item_value_model_count(self, item: CategoryItem) -> int:
-        """Returns the number of value models for an item."""
-        # This check `if self:` seems incorrect but was in original code.
-        # It likely always evaluates to True. Keeping it for compatibility.
-        if self:
-            return 1
-        return 0
-
-    def get_item_value_model(self, item: CategoryItem, column_id: int):
-        """Gets the value model for an item's column."""
-        if column_id == 0:
-            return item._value_models[0]
-        return None
-
-
-class CategoryDelegate(ui.AbstractItemDelegate):
-    """
-    Delegate for rendering category items in the tree view.
-    Defines how branches and labels are drawn.
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def build_branch(
-        self,
-        model: CategoryModel,
-        item: CategoryItem,
-        column_id: int,
-        level: int,
-        expanded: bool,
-    ):
-        """Builds the expand/collapse icons for tree branches."""
-        _line_color = cl("#5b5b5b")
-        _node_height = 32
-        _node_icon_width = 16
-        _node_root_size = 6
-        _node_root_icon_offset_y = (_node_height - _node_root_size) * 0.5
-        _node_root_icon_offset_x = (_node_icon_width - _node_root_size) * 0.5
-
-        if column_id == 0:
-            with ui.HStack(height=_node_height):
-                ui.Spacer(width=_node_icon_width * 0.5)
-                _has_children = bool(model.get_item_children(item))
-                if level == 0:
-                    if _has_children:
-                        icon = "minus.png" if expanded else "plus.png"
-                        ui.Image(
-                            os.path.join(EXT_PATH, "asset", icon),
-                            fill_policy=ui.FillPolicy.PRESERVE_ASPECT_FIT,
-                            alignment=ui.Alignment.LEFT_CENTER,
-                            width=_node_icon_width,
-                        )
-                        ui.Spacer(width=_node_icon_width * 0.5)
-                    else:
-                        if not item.category_id:
-                            pass
-                        else:
-                            if item.category_id != "All":
-                                with ui.Placer(
-                                    width=_node_icon_width,
-                                    draggable=False,
-                                    offset_x=_node_root_icon_offset_x,
-                                    offset_y=_node_root_icon_offset_y,
-                                ):
-                                    ui.Rectangle(
-                                        width=_node_root_size,
-                                        height=_node_root_size,
-                                        style={"background_color": cl("#ffffff")},
-                                    )
-                                ui.Spacer(width=_node_icon_width * 0.5)
-                else:
-                    for i in range(level):
-                        if i == 0:
-                            ui.Spacer(width=_node_icon_width * 0.5)
-                        else:
-                            ui.Spacer(width=_node_icon_width)
-                        ui.Line(
-                            height=ui.Percent(100),
-                            alignment=ui.Alignment.LEFT,
-                            style={"color": _line_color, "border_width": 1},
-                        )
-
-                    if _has_children:
-                        ui.Spacer(width=_node_icon_width * 0.5)
-                        icon = "minus.png" if expanded else "plus.png"
-                        ui.Image(
-                            os.path.join(EXT_PATH, "asset", icon),
-                            fill_policy=ui.FillPolicy.PRESERVE_ASPECT_FIT,
-                            alignment=ui.Alignment.LEFT_CENTER,
-                            width=_node_icon_width,
-                        )
-                        ui.Spacer(width=_node_icon_width * 0.5)
-                    else:
-                        ui.Line(
-                            width=_node_icon_width * 1.5,
-                            alignment=ui.Alignment.V_CENTER,
-                            style={"color": _line_color},
-                        )
-                        ui.Spacer(width=_node_icon_width * 0.5)
-
-    def build_widget(
-        self,
-        model: CategoryModel,
-        item: CategoryItem,
-        column_id: int,
-        level: int,
-        expanded: bool,
-    ):
-        """Builds the text/content widget for a tree item."""
-        if column_id == 0:
-            hstack = ui.HStack(spacing=0)
-            with hstack:
-                ui.Label(
-                    item.name,
-                    alignment=ui.Alignment.LEFT_CENTER,
-                    style_type_name_override="LabelInTreeView",
-                )
-
-    def build_header(self, column_id=0):
-        super().build_header(column_id)
-        return ui.Label("The Header")
+LOGIN_RESULT_LISTEN_PORT = 8090
 
 
 # --- Main Window Class ---
@@ -309,7 +70,7 @@ class SynthesisAssetsWindow(ui.Window):
 
     def __init__(self, visible=True):
         super().__init__(ASSETS_EXPLORER_NAME, visible=visible)
-        self.frame.set_build_fn(self._build_ui)
+        self.frame.set_build_fn(self._build_main_view)
         self.frame.set_style(GLOBAL_STYLE)
 
         self._gap = 6
@@ -393,11 +154,55 @@ class SynthesisAssetsWindow(ui.Window):
 
         # self._loading = FullScreenLoading()
 
+        self._web_runner: Optional[web.AppRunner] = None
+        asyncio.ensure_future(self._start_login_result_listener())
+
+    async def _start_login_result_listener(self):
+        if self._web_runner:
+            await self._web_runner.cleanup()
+            self._web_runner = None
+        app = web.Application()
+        app.router.add_post("/", self._handle_receive_login_result)
+        self._web_runner = web.AppRunner(app)
+        await self._web_runner.setup()
+        site = web.TCPSite(
+            self._web_runner,
+            "127.0.0.1",
+            LOGIN_RESULT_LISTEN_PORT,
+        )
+        await site.start()
+        print(f"Server running on http://127.0.0.1:{LOGIN_RESULT_LISTEN_PORT}")
+
+    async def _handle_receive_login_result(self, request: web.Request):
+        try:
+            data = await request.json()
+        except Exception as e:
+            carb.log_error(f"Failed to parse login result JSON: {e}")
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        token = data.get("Token")
+        login_user_info = data.get("LoginUserInfo", {})
+        # print(f"Received login result: Token={token}, UserInfo={login_user_info}")
+
+        if token and login_user_info:
+            APP_STATE.user_info = login_user_info
+            APP_STATE.token = token
+            user_type = login_user_info.get("UserType", 5)
+            self._is_system_admin = user_type <= 2
+            self._selected_visibility_tab_id = VISIBILITY_TABS[0].get("Id")
+            asyncio.ensure_future(self._delayed_rebuild_main_view())
+            nm.post_notification("Auth info updated successfully.",duration=2.0,status=nm.NotificationStatus.INFO,)
+            return web.json_response({"status": "success"})
+        else:
+            carb.log_warn("Login result missing Token or LoginUserInfo")
+            nm.post_notification("Invalid auth info format.",duration=2.0,status=nm.NotificationStatus.WARNING,)
+            return web.json_response({"error": "Missing Token or UserInfo"}, status=400)
+
     # --- UI Rebuilding Utilities ---
     def _rebuild_main_view(self):
         """Clears and rebuilds the main browsing interface."""
         self.frame.clear()
-        self._build_ui()
+        self._build_main_view()
 
     def _on_asset_type_click(self, asset_type: Dict[str, Any]):
         """Handles click on an asset type button."""
@@ -439,15 +244,6 @@ class SynthesisAssetsWindow(ui.Window):
             self._search_timer_handle.cancel()
         asyncio.ensure_future(DATA_MANAGER.close())
 
-    # --- Root UI Building ---
-    def _build_ui(self):
-        # """Builds the root UI: login or main view."""
-        # if APP_STATE.is_logged_in:
-        #     self._build_main_view()
-        # else:
-        #     self._build_login_view()
-        self._build_main_view()
-
     # --- Main Browsing Interface ---
     def _build_main_view(self):
         """Builds the main asset browsing interface."""
@@ -482,138 +278,6 @@ class SynthesisAssetsWindow(ui.Window):
                 self._category_view_frame = ui.Frame()
                 self._build_category_view()
 
-    # --- Login Interface ---
-    def _build_login_view(self):
-        """Builds the login interface."""
-        _label_width = 100
-        with self.frame:
-            with ui.VStack(spacing=self._gap * 2):
-                ui.Label(
-                    "Login to Synthesis",
-                    alignment=ui.Alignment.CENTER,
-                    height=ui.Length(80),
-                    style={"font_size": 32},
-                )
-
-                with ui.HStack(height=24):
-                    ui.Label("Account", width=_label_width)
-                    _account_field = ui.StringField()
-                self._login_widgets["username"] = _account_field
-
-                with ui.HStack(height=24):
-                    ui.Label("Password", width=_label_width)
-                    _pwd_field = ui.StringField()
-                    _pwd_field.password_mode = True
-                self._login_widgets["password"] = _pwd_field
-
-                with ui.HStack(height=ui.Length(0)):
-                    ui.Label("Remember Me", width=_label_width)
-                    _remberme_field = ui.CheckBox(name="greenCheck")
-                self._login_widgets["remember_me"] = _remberme_field
-
-                if APP_STATE.username:
-                    _account_field.model.set_value(APP_STATE.username)
-                if APP_STATE.remember_me:
-                    _remberme_field.model.set_value(True)
-                    if APP_STATE.password:
-                        _pwd_field.model.set_value(APP_STATE.password)
-
-                with ui.HStack(height=24):
-                    ui.Spacer(width=_label_width)
-                    ui.Button(
-                        "Login",
-                        width=80,
-                        clicked_fn=self._handle_login,
-                        tooltip="Click to login",
-                    )
-                    ui.Spacer(width=self._gap)
-                    self._login_widgets["status_label"] = ui.Label(
-                        "", style={"color": cl.red}
-                    )
-
-    def _handle_login(self):
-        """Handles the login button click event."""
-        username_model = self._login_widgets["username"].model
-        password_model = self._login_widgets["password"].model
-        remember_me_model = self._login_widgets["remember_me"].model
-
-        username = username_model.get_value_as_string().strip()
-        password = password_model.get_value_as_string()
-        remember_me = remember_me_model.get_value_as_bool()
-
-        if not username or not password:
-            self._login_widgets["status_label"].text = (
-                "Account and password are required."
-            )
-            return
-
-        self._login_widgets["status_label"].style = {"color": cl.green}
-        self._login_widgets["status_label"].text = "Logging in..."
-        asyncio.ensure_future(self._login_task(username, password, remember_me))
-
-    async def _login_task(self, username: str, password: str, remember_me: bool):
-        """Performs the asynchronous login request."""
-        try:
-            response = await DATA_MANAGER.login(
-                LOGIN_URL, username, encrypt_aes(password)
-            )
-
-            if response:
-                token = response.get("Token")
-                login_user_info = response.get("LoginUserInfo", {})
-
-                if token:
-                    APP_STATE.save_credentials(username, password, remember_me)
-                    APP_STATE.login(token, username, login_user_info)
-
-                    user_type = login_user_info.get("UserType", 5)
-                    self._is_system_admin = user_type <= 2
-
-                    asyncio.ensure_future(self._delayed_login_rebuild())
-                else:
-                    self._login_widgets["status_label"].style = {"color": cl.red}
-                    self._login_widgets["status_label"].text = (
-                        "Login failed: No token in response."
-                    )
-            else:
-                msg = response.get("MessageCode", "Unknown login error")
-                self._login_widgets["status_label"].style = {"color": cl.red}
-                self._login_widgets["status_label"].text = f"Login failed: {msg}"
-
-        except ConnectionError as e:
-            self._login_widgets["status_label"].style = {"color": cl.red}
-            self._login_widgets["status_label"].text = f"Connection error: {str(e)}"
-            carb.log_error(f"Login connection error: {e}")
-        except ValueError as e:
-            self._login_widgets["status_label"].style = {"color": cl.red}
-            self._login_widgets["status_label"].text = f"Server error: {str(e)}"
-            carb.log_error(f"Login server error: {e}")
-        except Exception as e:
-            self._login_widgets["status_label"].style = {"color": cl.red}
-            self._login_widgets["status_label"].text = f"Error: {str(e)}"
-            carb.log_error(f"Login exception: {e}")
-
-    async def _delayed_login_rebuild(self):
-        """Rebuilds UI after successful login."""
-        await omni.kit.app.get_app().next_update_async()
-        self._login_widgets.clear()
-        self.frame.clear()
-        self._build_ui()
-
-    def _handle_logout(self):
-        """Handles logout by clearing app state and rebuilding UI."""
-        self._asset_category_id_selected = None
-        self._asset_type_id_selected = ASSET_TYPES[0].get("Id")
-        self._reset_pagination_state(True)
-        APP_STATE.logout()
-        asyncio.ensure_future(self._delayed_logout_rebuild())
-
-    async def _delayed_logout_rebuild(self):
-        """Rebuilds UI after logout."""
-        await omni.kit.app.get_app().next_update_async()
-        self.frame.clear()
-        self._build_ui()
-
     def _build_category_view(self):
         """Builds the category view including tabs, logout, and the tree/grid area."""
         if not self._category_view_frame:
@@ -637,7 +301,6 @@ class SynthesisAssetsWindow(ui.Window):
                 self._build_category_content_panels()
                 asyncio.ensure_future(self._load_and_build_asset_tree())
                 self._setup_splitter_drag()
-                # self._setup_detail_splitter_drag() # Not used in current UI
 
     def _handle_open_in_browser(self):
         """Handles the 'Open In Browser' button click event."""
@@ -663,6 +326,7 @@ class SynthesisAssetsWindow(ui.Window):
         carb.log_info("Settings button clicked.")
         field_defs = [
             SettingModal.FieldDef("usd_server", "Server", ui.StringField, BASE_URL2),
+            SettingModal.FieldDef("auth_info", "Auth Info", ui.StringField, ""),
         ]
 
         def _handle_form_submit(dialog: SettingModal):
@@ -689,6 +353,39 @@ class SynthesisAssetsWindow(ui.Window):
                     duration=2.0,
                     status=nm.NotificationStatus.INFO,
                 )
+
+            auth_info = values.get("auth_info", "").strip()
+            if auth_info:
+                try:
+                    decoded_bytes = base64.b64decode(auth_info)
+                    auth_info = decoded_bytes.decode('utf-8')
+                    auth_data = json.loads(auth_info)
+                    token = auth_data.get("Token")
+                    login_user_info = auth_data.get("LoginUserInfo", {})
+                    if token and login_user_info:
+                        APP_STATE.user_info = login_user_info
+                        APP_STATE.token = token
+                        user_type = login_user_info.get("UserType", 5)
+                        self._is_system_admin = user_type <= 2
+                        self._selected_visibility_tab_id = VISIBILITY_TABS[0].get("Id")
+                        asyncio.ensure_future(self._delayed_rebuild_main_view())
+                        nm.post_notification(
+                            "Auth info updated successfully.",
+                            duration=2.0,
+                            status=nm.NotificationStatus.INFO,
+                        )
+                    else:
+                        nm.post_notification(
+                            "Invalid auth info format.",
+                            duration=2.0,
+                            status=nm.NotificationStatus.WARNING,
+                        )
+                except json.JSONDecodeError:
+                    nm.post_notification(
+                        "Failed to parse auth info.",
+                        duration=2.0,
+                        status=nm.NotificationStatus.WARNING,
+                    )
             dialog.destroy()
 
         dialog = SettingModal(
@@ -703,18 +400,18 @@ class SynthesisAssetsWindow(ui.Window):
     def _build_category_header(self):
         """Builds the fixed header containing tabs and logout button."""
         with ui.HStack(spacing=self._gap, height=0):
-            # if not self._is_system_admin:
-            #     for tab_item in VISIBILITY_TABS:
-            #         ui.Button(
-            #             tab_item.get("Name"),
-            #             width=ui.Length(120),
-            #             height=self._btn_size,
-            #             checked=tab_item.get("Id") == self._selected_visibility_tab_id,
-            #             selected=tab_item.get("Id") == self._selected_visibility_tab_id,
-            #             clicked_fn=lambda tab=tab_item: self._on_visibility_tab_click(
-            #                 tab
-            #             ),
-            #         )
+            if APP_STATE.is_logged_in and not self._is_system_admin:
+                for tab_item in VISIBILITY_TABS:
+                    ui.Button(
+                        tab_item.get("Name"),
+                        width=ui.Length(120),
+                        height=self._btn_size,
+                        checked=tab_item.get("Id") == self._selected_visibility_tab_id,
+                        selected=tab_item.get("Id") == self._selected_visibility_tab_id,
+                        clicked_fn=lambda tab=tab_item: self._on_visibility_tab_click(
+                            tab
+                        ),
+                    )
 
             ui.Spacer()
             ui.Button(
@@ -723,12 +420,6 @@ class SynthesisAssetsWindow(ui.Window):
                 height=self._btn_size,
                 clicked_fn=self._handle_setting,
             )
-            # ui.Button(
-            #     "Logout",
-            #     width=80,
-            #     height=self._btn_size,
-            #     clicked_fn=self._handle_logout,
-            # )
 
     def _build_category_toolbar(self):
         """Builds the toolbar with toggle buttons and search bar."""
@@ -1115,12 +806,11 @@ class SynthesisAssetsWindow(ui.Window):
             return
 
         try:
-            _target_url = (
-                selected_asset_type.get("CategoryListUrl")
-                if APP_STATE.is_logged_in
-                else selected_asset_type.get("CategoryListUrlFree")
+            category_list = await DATA_MANAGER.get_category_tree(
+                self._asset_type_id_selected,
+                self._is_system_admin,
+                self._selected_visibility_tab_id,
             )
-            category_list = await DATA_MANAGER.get_category_tree(_target_url)
             await omni.kit.app.get_app().next_update_async()
 
             self._tree_panel_frame.clear()
@@ -1159,8 +849,6 @@ class SynthesisAssetsWindow(ui.Window):
                             style={"color": cl.gray},
                             alignment=ui.Alignment.CENTER,
                         )
-                        # Initialize grid even if no categories
-                        self._build_asset_grid([], "")
 
         except Exception as e:
             carb.log_error(f"Failed to build asset tree view: {e}")
@@ -1175,13 +863,6 @@ class SynthesisAssetsWindow(ui.Window):
 
         if selected_item:
             category_id = selected_item.category_id
-            # Prevent redundant loading if the same category is selected again
-            if self._asset_category_id_selected == category_id:
-                carb.log_info(
-                    f"Category {category_id} is already loaded or loading (via selection)."
-                )
-                return
-
             # Reset state for new category selection
             self._asset_category_id_selected = category_id
             self._reset_pagination_state(True)
@@ -1282,65 +963,12 @@ class SynthesisAssetsWindow(ui.Window):
         self._splitter_placer.set_mouse_pressed_fn(on_placer_pressed)
         self._splitter_placer.set_mouse_moved_fn(on_placer_moved)
 
-    def _setup_detail_splitter_drag(self):
-        """Sets up mouse event handlers for the detail draggable splitter."""
-        # This function is currently unused in the UI layout.
-        # The detail panel is placed directly in the HStack.
-        # If you want to make the detail panel resizable, you would need to
-        # uncomment the relevant parts in _build_category_content_panels and
-        # implement this function correctly.
-        # Placeholder for future implementation if needed.
-        carb.log_warn(
-            "_setup_detail_splitter_drag is not implemented for current UI layout."
-        )
-        pass
-        # if (
-        #     not self._detail_splitter_rect
-        #     or not self._detail_splitter_placer
-        #     or not self._detail_panel_frame
-        # ):
-        #     carb.log_warn("Splitter components not found, cannot setup drag.")
-        #     return
-
-        # def on_placer_pressed(x, y, button, modifier):
-        #     if button == 0:
-        #         self._drag_start_detail_width = self._detail_panel_frame.width.value
-        #         self._drag_start_detail_x = x
-        #         self._detail_splitter_rect.set_style(
-        #             {"background_color": cl("#3b70b0")}
-        #         )
-
-        # def on_placer_hovered(is_hovered):
-        #     if is_hovered:
-        #         self._detail_splitter_rect.set_style(
-        #             {"background_color": cl("#3b70b0")}
-        #         )
-        #     else:
-        #         self._detail_splitter_rect.set_style(
-        #             {"background_color": SEPARATOR_COLOR}
-        #         )
-
-        # def on_placer_moved(x, y, a, b):
-        #     if self._detail_splitter_placer.dragging:
-        #         delta_x = x - self._drag_start_detail_x
-        #         new_width = self._drag_start_detail_width + delta_x
-        #         new_width = max(
-        #             ASSET_DETAIL_MIN_WIDTH, min(new_width, ASSET_DETAIL_MAX_WIDTH)
-        #         )
-        #         self._detail_panel_frame.width = ui.Length(new_width)
-        #         self._detail_splitter_placer.offset_x = 0
-
-        # self._detail_splitter_placer.set_mouse_hovered_fn(on_placer_hovered)
-        # self._detail_splitter_placer.set_mouse_pressed_fn(on_placer_pressed)
-        # self._detail_splitter_placer.set_mouse_moved_fn(on_placer_moved)
-
     # --- Asset Loading and Grid Building with Lazy Loading ---
 
     async def _load_assets_for_category(self, category_id: str, page_index: int = 1):
         """Loads assets for a given category ID from the API, supporting pagination and search."""
         # Prevent overlapping requests
         if self._is_loading_more:
-            carb.log_warn("_load_assets_for_category called while already loading.")
             return
 
         self._is_loading_more = True
@@ -1364,18 +992,7 @@ class SynthesisAssetsWindow(ui.Window):
             self._is_loading_more = False
             return
 
-        is_loading_public = (
-            True
-            if self._is_system_admin
-            else (self._selected_visibility_tab_id == "Public")
-        )
-        list_api_url = (
-            selected_asset_type["CategoryItemContentUrl"]
-            if APP_STATE.is_logged_in
-            else selected_asset_type["CategoryItemContentUrlFree"]
-        )
         thumbnail_api_url = selected_asset_type["ThumbnailUrl"]
-        _data_type = 1 if is_loading_public else 2
 
         search_keyword = ""
         if self._search_bar:
@@ -1387,13 +1004,7 @@ class SynthesisAssetsWindow(ui.Window):
             "PageSize": self._page_size,
             "OrderByType": -1,
             "Key": search_keyword,
-            "DataType": _data_type,
         }
-        # print("params", params)
-
-        carb.log_info(
-            f"Loading assets for category '{category_id}', page {page_index}, with keyword '{search_keyword}'"
-        )
 
         try:
 
@@ -1401,10 +1012,14 @@ class SynthesisAssetsWindow(ui.Window):
                 try:
                     return json.loads(path_str)
                 except json.JSONDecodeError:
-                    # carb.log_error(f"{asset_name}: Error deserializing 'UsdCurrentPath'")
                     return ""
 
-            assets_data = await DATA_MANAGER.get_asset_list(list_api_url, params)
+            assets_data = await DATA_MANAGER.get_asset_list(
+                self._asset_type_id_selected,
+                params,
+                self._is_system_admin,
+                self._selected_visibility_tab_id,
+            )
 
             raw_data_list = assets_data.get("List", [])
             self._total_pages_from_api = assets_data.get("PageCount", 0)
@@ -1711,9 +1326,7 @@ class SynthesisAssetsWindow(ui.Window):
             "UserName": "Free Extension User",
             "ModelBusinessType": selected_asset_type.get("ModelBusinessType", ""),
         }
-        await DATA_MANAGER.log_asset_load_record(
-            f"{BASE_URL1}/api/Global/AddLoadRecord", _data
-        )
+        await DATA_MANAGER.log_asset_load_record(_data)
 
     def _update_grid_with_error(self, error_message: str):
         """Helper to update the asset grid frame with an error message."""

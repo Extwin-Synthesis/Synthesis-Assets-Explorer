@@ -107,7 +107,7 @@ def get_field_value(field: ui.AbstractField) -> Union[str, int, float, bool]:
     Returns:
         Union[str, int, float, bool]
     """
-    
+
     if not field:
         return None
     if isinstance(field, ui.StringField):
@@ -121,7 +121,8 @@ def get_field_value(field: ui.AbstractField) -> Union[str, int, float, bool]:
     else:
         # TODO: Retrieve values for MultiField
         return None
-    
+
+
 def on_copy_to_clipboard(to_copy: str) -> int | None:
     """
     Copy text to system clipboard

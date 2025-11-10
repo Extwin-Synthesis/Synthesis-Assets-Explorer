@@ -10,6 +10,78 @@ from .app_state import APP_STATE
 HTTP_SUCCESS = 200
 BUSINESS_SUCCESS = 200  # Standard success code for the main backend API
 
+BASE_URL1 = "https://synthesis-server.extwin.com"
+BASE_URL2 = "https://multiverse-server.vothing.com"
+BASE_URL3 = "https://synthesis.extwin.com"
+
+ASSET_TYPES: list = [
+    {
+        "Id": "SimReady",
+        "Name": "Sim Ready",
+        "CategoryListUrl": f"{BASE_URL1}/api/SimReady/GetCategoryList",
+        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetCategoryList",
+        "CategoryListUrlPrivate": f"{BASE_URL1}/api/EnterpriseSimReady/GetCategoryList",
+        "CategoryItemContentUrl": f"{BASE_URL1}/api/SimReady/GetSimReadyList",
+        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetSimReadyList",
+        "CategoryItemContentUrlPrivate": f"{BASE_URL1}/api/EnterpriseSimReady/GetSimReadyList",
+        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/SimReady/Image",
+        "TypeInBrowser": "assets-simready",
+        "ModelBusinessType": 1,
+    },
+    {
+        "Id": "Model",
+        "Name": "Model",
+        "CategoryListUrl": f"{BASE_URL1}/api/Model/GetCategoryList",
+        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetModelCategoryList",
+        "CategoryListUrlPrivate": f"{BASE_URL1}/api/EnterpriseModel/GetCategoryList",
+        "CategoryItemContentUrl": f"{BASE_URL1}/api/Model/GetModelList",
+        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetModelList",
+        "CategoryItemContentUrlPrivate": f"{BASE_URL1}/api/EnterpriseModel/GetModelList",
+        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Model/Image",
+        "TypeInBrowser": "assets-model",
+        "ModelBusinessType": 2,
+    },
+    {
+        "Id": "_3dGS",
+        "Name": "3D Gauss Splatting",
+        "CategoryListUrl": f"{BASE_URL1}/api/Gs/GetCategoryList",
+        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetGsCategoryList",
+        "CategoryListUrlPrivate": f"{BASE_URL1}/api/EnterpriseGs/GetCategoryList",
+        "CategoryItemContentUrl": f"{BASE_URL1}/api/Gs/GetGsList",
+        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetGsList",
+        "CategoryItemContentUrlPrivate": f"{BASE_URL1}/api/EnterpriseGs/GetGsList",
+        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Gs/Image",
+        "TypeInBrowser": "assets-gs",
+        "ModelBusinessType": 3,
+    },
+    {
+        "Id": "Robot",
+        "Name": "Robot",
+        "CategoryListUrl": f"{BASE_URL1}/api/Noumen/GetCategoryList",
+        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetRobotCategoryList",
+        "CategoryListUrlPrivate": f"{BASE_URL1}/api/EnterpriseNoumen/GetCategoryList",
+        "CategoryItemContentUrl": f"{BASE_URL1}/api/Robot/GetRobotList",
+        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetRobotList",
+        "CategoryItemContentUrlPrivate": f"{BASE_URL1}/api/EnterpriseRobot/GetRobotList",
+        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Robot/Image",
+        "TypeInBrowser": "assets-ontology",
+        "ModelBusinessType": 5,
+    },
+    {
+        "Id": "Scene",
+        "Name": "Scene",
+        "CategoryListUrl": f"{BASE_URL1}/api/Scene/GetCategoryList",
+        "CategoryListUrlFree": f"{BASE_URL1}/api/Global/GetSceneCategoryList",
+        "CategoryListUrlPrivate": f"{BASE_URL1}/api/EnterpriseScene/GetCategoryList",
+        "CategoryItemContentUrl": f"{BASE_URL1}/api/Scene/GetSceneList",
+        "CategoryItemContentUrlFree": f"{BASE_URL1}/api/Global/GetSceneList",
+        "CategoryItemContentUrlPrivate": f"{BASE_URL1}/api/EnterpriseScene/GetSceneList",
+        "ThumbnailUrl": f"{BASE_URL1}/api/Usd/Scene/Image",
+        "TypeInBrowser": "assets-scene",
+        "ModelBusinessType": 6,
+    },
+]
+
 
 # --- Custom Exception Classes ---
 class DataManagerError(Exception):
@@ -46,8 +118,6 @@ class DataManager:
     Provides a context manager for clean resource management.
 
     - Uses `_request` for the main backend API (adds Token, checks standard error codes).
-    - Uses dedicated methods (like `get_query_usd_path`) for other API endpoints
-      with potentially different protocols or response formats.
     """
 
     _instance: Optional["DataManager"] = None
@@ -191,93 +261,75 @@ class DataManager:
                 f"Unexpected error during main API request to {method} {path}."
             ) from e
 
-    # --- Methods for Main Backend API Endpoints ---
-
-    async def login(self, url: str, username: str, password: str) -> Dict[str, Any]:
-        """Performs user login to the main backend API."""
-        return await self._request(
-            "POST", url, json={"LoginAccount": username, "LoginPwd": password}
-        )
-
-    async def get_category_tree(self, path: str) -> List[Dict[str, Any]]:
+    async def get_category_tree(
+        self,
+        asset_type_id: str,
+        _is_system_admin: bool = False,
+        _selected_visibility_tab_id: str = "Public",
+    ) -> List[Dict[str, Any]]:
         """Fetches category tree data from the main backend API."""
-        return await self._request("GET", path)
+        selected_asset_type = next(
+            (item for item in ASSET_TYPES if item["Id"] == asset_type_id),
+            None,
+        )
+        if not selected_asset_type:
+            carb.log_error("Invalid asset type selection.")
+            return
+        _target_url = ""
+        if APP_STATE.is_logged_in:
+            if _is_system_admin:
+                _target_url = selected_asset_type["CategoryListUrl"]
+            else:
+                _target_url = selected_asset_type["CategoryListUrlPrivate"]
+        else:
+            _target_url = selected_asset_type["CategoryListUrlFree"]
 
-    async def get_asset_list(self, path: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        _list = await self._request("GET", _target_url)
+
+        if not isinstance(_list, list) or len(_list) < 1:
+            carb.log_error("Category list response is not a list.")
+            return []
+        else:
+            _is_system = True if _selected_visibility_tab_id == "Public" else False
+            _filtered_list = [x for x in _list if x.get("IsSystem") == _is_system]
+            return _filtered_list
+
+    async def get_asset_list(
+        self,
+        asset_type_id: str,
+        params: Dict[str, Any],
+        _is_system_admin: bool = False,
+        _selected_visibility_tab_id: str = "Public",
+    ) -> Dict[str, Any]:
         """Fetches asset list from the main backend API."""
-        return await self._request("GET", path, params=params)
+        selected_asset_type = next(
+            (item for item in ASSET_TYPES if item["Id"] == asset_type_id),
+            None,
+        )
+        if not selected_asset_type:
+            carb.log_error("Invalid asset type selection.")
+            return
+        _target_url = ""
+        if APP_STATE.is_logged_in:
+            if _is_system_admin:
+                _target_url = selected_asset_type["CategoryItemContentUrl"]
+                params["DataType"] = 1  # Public data only
+            else:
+                _target_url = selected_asset_type["CategoryItemContentUrlPrivate"]
+                if _selected_visibility_tab_id == "Private":
+                    params["DataType"] = 2  # Private
+                else:
+                    params["DataType"] = 1  # Public
+        else:
+            _target_url = selected_asset_type["CategoryItemContentUrlFree"]
+            params["DataType"] = 1  # Public
 
-    # --- Methods for Other/Specific API Endpoints ---
+        return await self._request("GET", _target_url, params=params)
 
-    async def get_query_usd_path(self, other_endpoint_url: str) -> Optional[str]:
-        """
-        Queries a USD path from a different API endpoint.
-        Does NOT automatically add the standard 'Token' header.
-        Uses a temporary session.
-        """
-        timeout = aiohttp.ClientTimeout(total=60)
-        try:
-            async with aiohttp.ClientSession(timeout=timeout) as temp_session:
-                carb.log_info(
-                    f"[DataManager] Querying USD path from other endpoint: {other_endpoint_url}"
-                )
-                async with temp_session.get(other_endpoint_url) as response:
-                    carb.log_info(
-                        f"[DataManager] Received response from other endpoint, status: {response.status}"
-                    )
-
-                    if response.status != HTTP_SUCCESS:
-                        error_text = await response.text()
-                        carb.log_error(
-                            f"[DataManager] Other Endpoint HTTP Error {response.status}: {error_text}"
-                        )
-                        return None
-
-                    raw_text = await response.text()
-                    carb.log_info(
-                        f"[DataManager] Raw response text from other endpoint: {raw_text}"
-                    )  # Changed from log_debug
-
-                    try:
-                        result = await response.json()
-                    except aiohttp.ContentTypeError:
-                        carb.log_error(
-                            f"[DataManager] Other Endpoint response is not valid JSON. "
-                            f"Content-Type: {response.content_type}, Body: {raw_text}"
-                        )
-                        return None
-
-                    if isinstance(result, list) and len(result) > 0:
-                        usd_path = result[0]
-                        if isinstance(usd_path, str) and usd_path:
-                            carb.log_info(
-                                f"[DataManager] USD path retrieved from other endpoint: {usd_path}"
-                            )
-                            return usd_path
-                        else:
-                            carb.log_warn(
-                                f"[DataManager] USD path query returned invalid/empty path at index 0: {usd_path}"
-                            )
-                            return None
-                    else:
-                        carb.log_warn(
-                            f"[DataManager] USD path query returned empty list or non-list: {result}"
-                        )
-                        return None
-
-        except aiohttp.ClientError as e:
-            carb.log_error(
-                f"[DataManager] Network error querying other endpoint {other_endpoint_url}: {e}"
-            )
-            return None
-        except Exception as e:
-            carb.log_error(
-                f"[DataManager] Unexpected error querying other endpoint {other_endpoint_url}: {e}"
-            )
-            return None
-
-    async def log_asset_load_record(self, url, data: dict):
-        return await self._request("POST", url, json=data)
+    async def log_asset_load_record(self, data: dict):
+        return await self._request(
+            "POST", f"{BASE_URL1}/api/Global/AddLoadRecord", json=data
+        )
 
 
 # Create the global singleton instance

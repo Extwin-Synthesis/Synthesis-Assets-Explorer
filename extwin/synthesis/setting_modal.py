@@ -161,8 +161,8 @@ class FormWidget:
                             field_def.label,
                             style_type_name_override="Field.Label",
                             name="prefix",
-                            alignment=ui.Alignment.RIGHT_CENTER,
-                            width=0,
+                            alignment=ui.Alignment.CENTER,
+                            width=60,
                         )
                         ui.Spacer(width=6)
                         field = field_def.type(
