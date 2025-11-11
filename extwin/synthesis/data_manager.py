@@ -9,6 +9,8 @@ from .app_state import APP_STATE
 # --- Constants ---
 HTTP_SUCCESS = 200
 BUSINESS_SUCCESS = 200  # Standard success code for the main backend API
+TOKEN_EXPIRED_CODE = 401  # Code for token expiration
+TOKEN_EXPIRED_MESSAGE = "Token has expired"
 
 BASE_URL1 = "https://synthesis-server.extwin.com"
 BASE_URL2 = "https://multiverse-server.vothing.com"
@@ -81,7 +83,6 @@ ASSET_TYPES: list = [
         "ModelBusinessType": 6,
     },
 ]
-
 
 # --- Custom Exception Classes ---
 class DataManagerError(Exception):
@@ -190,15 +191,13 @@ class DataManager:
         headers["Token"] = APP_STATE.token or ""
 
         try:
-            carb.log_info(
-                f"[DataManager] Sending {method} request to main API: {path}"
-            )  # Changed from log_debug
+            carb.log_info(f"[DataManager] Sending {method} request to main API: {path}")
             async with session.request(
                 method, path, headers=headers, **kwargs
             ) as response:
                 carb.log_info(
                     f"[DataManager] Received response for {method} {path}, status: {response.status}"
-                )  # Changed from log_debug
+                )
 
                 if response.status != HTTP_SUCCESS:
                     error_text = await response.text()
@@ -211,7 +210,7 @@ class DataManager:
                     json_data = await response.json()
                     carb.log_info(
                         f"[DataManager] Parsed JSON response for {method} {path}"
-                    )  # Changed from log_debug
+                    )
                 except aiohttp.ContentTypeError as e:
                     raw_text = await response.text()
                     carb.log_error(
@@ -232,6 +231,13 @@ class DataManager:
                     error_code = json_data.get("ErrorCode", -1)
                     status_code = json_data.get("StatusCode", -1)
                     message = json_data.get("MessageCode", "Unknown error")
+                    if error_code == TOKEN_EXPIRED_CODE:
+                        APP_STATE.is_token_expired = True
+                        APP_STATE.is_system_admin = False
+                        carb.log_error(
+                            f"[DataManager] Token expired for {method} {path}."
+                        )
+                        raise BusinessLogicException(TOKEN_EXPIRED_MESSAGE)
 
                     if (
                         error_code != BUSINESS_SUCCESS
@@ -248,7 +254,7 @@ class DataManager:
                 result = json_data.get("Result", {})
                 carb.log_info(
                     f"[DataManager] Main API request {method} {path} successful."
-                )  # Changed from log_debug
+                )
                 return result
 
         except (HTTPException, BusinessLogicException, DataParsingException):
@@ -264,7 +270,6 @@ class DataManager:
     async def get_category_tree(
         self,
         asset_type_id: str,
-        _is_system_admin: bool = False,
         _selected_visibility_tab_id: str = "Public",
     ) -> List[Dict[str, Any]]:
         """Fetches category tree data from the main backend API."""
@@ -276,13 +281,16 @@ class DataManager:
             carb.log_error("Invalid asset type selection.")
             return
         _target_url = ""
-        if APP_STATE.is_logged_in:
-            if _is_system_admin:
+        if _selected_visibility_tab_id == "Public":
+            if APP_STATE.is_system_admin:
                 _target_url = selected_asset_type["CategoryListUrl"]
             else:
-                _target_url = selected_asset_type["CategoryListUrlPrivate"]
-        else:
-            _target_url = selected_asset_type["CategoryListUrlFree"]
+                if (not APP_STATE.is_token_expired) and APP_STATE.is_logged_in:
+                    _target_url = selected_asset_type["CategoryListUrlPrivate"]
+                else:
+                    _target_url = selected_asset_type["CategoryListUrlFree"]
+        elif _selected_visibility_tab_id == "Private":
+            _target_url = selected_asset_type["CategoryListUrlPrivate"]
 
         _list = await self._request("GET", _target_url)
 
@@ -298,7 +306,6 @@ class DataManager:
         self,
         asset_type_id: str,
         params: Dict[str, Any],
-        _is_system_admin: bool = False,
         _selected_visibility_tab_id: str = "Public",
     ) -> Dict[str, Any]:
         """Fetches asset list from the main backend API."""
@@ -310,19 +317,18 @@ class DataManager:
             carb.log_error("Invalid asset type selection.")
             return
         _target_url = ""
-        if APP_STATE.is_logged_in:
-            if _is_system_admin:
-                _target_url = selected_asset_type["CategoryItemContentUrl"]
-                params["DataType"] = 1  # Public data only
-            else:
-                _target_url = selected_asset_type["CategoryItemContentUrlPrivate"]
-                if _selected_visibility_tab_id == "Private":
-                    params["DataType"] = 2  # Private
-                else:
-                    params["DataType"] = 1  # Public
-        else:
-            _target_url = selected_asset_type["CategoryItemContentUrlFree"]
+        if _selected_visibility_tab_id == "Public":
             params["DataType"] = 1  # Public
+            if APP_STATE.is_system_admin:
+                _target_url = selected_asset_type["CategoryItemContentUrl"]
+            else:
+                if (not APP_STATE.is_token_expired) and APP_STATE.is_logged_in:
+                    _target_url = selected_asset_type["CategoryItemContentUrlPrivate"]
+                else:
+                    _target_url = selected_asset_type["CategoryItemContentUrlFree"]
+        elif _selected_visibility_tab_id == "Private":
+            _target_url = selected_asset_type["CategoryItemContentUrlPrivate"]
+            params["DataType"] = 2  # Private
 
         return await self._request("GET", _target_url, params=params)
 

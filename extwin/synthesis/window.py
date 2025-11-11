@@ -24,6 +24,8 @@ import base64
 
 from .tree_models import CategoryItem, CategoryModel, CategoryDelegate
 
+from .data_manager import TOKEN_EXPIRED_MESSAGE
+
 # --- Constants and Configuration ---
 EXT_PATH = os.path.dirname(__file__)
 GLOBAL_STYLE = get_style()
@@ -80,7 +82,6 @@ class SynthesisAssetsWindow(ui.Window):
         # State
         self._asset_type_id_selected = ASSET_TYPES[0].get("Id")
         self._selected_visibility_tab_id = VISIBILITY_TABS[0].get("Id")
-        self._is_system_admin = False
         self._asset_data_selected: Optional[Dict[str, Any]] = None
 
         # UI Frames and Components
@@ -181,21 +182,30 @@ class SynthesisAssetsWindow(ui.Window):
             return web.json_response({"error": "Invalid JSON"}, status=400)
 
         token = data.get("Token")
-        login_user_info = data.get("LoginUserInfo", {})
+        login_user_info = data.get("LoginUserInfo", None)
         # print(f"Received login result: Token={token}, UserInfo={login_user_info}")
 
         if token and login_user_info:
             APP_STATE.user_info = login_user_info
             APP_STATE.token = token
+            APP_STATE.is_token_expired = False
             user_type = login_user_info.get("UserType", 5)
-            self._is_system_admin = user_type <= 2
+            APP_STATE.is_system_admin = user_type <= 2
             self._selected_visibility_tab_id = VISIBILITY_TABS[0].get("Id")
             asyncio.ensure_future(self._delayed_rebuild_main_view())
-            nm.post_notification("Auth info updated successfully.",duration=2.0,status=nm.NotificationStatus.INFO,)
+            nm.post_notification(
+                "Auth info updated successfully.",
+                duration=2.0,
+                status=nm.NotificationStatus.INFO,
+            )
             return web.json_response({"status": "success"})
         else:
             carb.log_warn("Login result missing Token or LoginUserInfo")
-            nm.post_notification("Invalid auth info format.",duration=2.0,status=nm.NotificationStatus.WARNING,)
+            nm.post_notification(
+                "Invalid auth info format.",
+                duration=2.0,
+                status=nm.NotificationStatus.WARNING,
+            )
             return web.json_response({"error": "Missing Token or UserInfo"}, status=400)
 
     # --- UI Rebuilding Utilities ---
@@ -358,15 +368,16 @@ class SynthesisAssetsWindow(ui.Window):
             if auth_info:
                 try:
                     decoded_bytes = base64.b64decode(auth_info)
-                    auth_info = decoded_bytes.decode('utf-8')
+                    auth_info = decoded_bytes.decode("utf-8")
                     auth_data = json.loads(auth_info)
                     token = auth_data.get("Token")
-                    login_user_info = auth_data.get("LoginUserInfo", {})
+                    login_user_info = auth_data.get("LoginUserInfo", None)
                     if token and login_user_info:
                         APP_STATE.user_info = login_user_info
                         APP_STATE.token = token
+                        APP_STATE.is_token_expired = False
                         user_type = login_user_info.get("UserType", 5)
-                        self._is_system_admin = user_type <= 2
+                        APP_STATE.is_system_admin = user_type <= 2
                         self._selected_visibility_tab_id = VISIBILITY_TABS[0].get("Id")
                         asyncio.ensure_future(self._delayed_rebuild_main_view())
                         nm.post_notification(
@@ -400,7 +411,7 @@ class SynthesisAssetsWindow(ui.Window):
     def _build_category_header(self):
         """Builds the fixed header containing tabs and logout button."""
         with ui.HStack(spacing=self._gap, height=0):
-            if APP_STATE.is_logged_in and not self._is_system_admin:
+            if APP_STATE.is_logged_in and not APP_STATE.is_system_admin:
                 for tab_item in VISIBILITY_TABS:
                     ui.Button(
                         tab_item.get("Name"),
@@ -808,7 +819,6 @@ class SynthesisAssetsWindow(ui.Window):
         try:
             category_list = await DATA_MANAGER.get_category_tree(
                 self._asset_type_id_selected,
-                self._is_system_admin,
                 self._selected_visibility_tab_id,
             )
             await omni.kit.app.get_app().next_update_async()
@@ -851,8 +861,18 @@ class SynthesisAssetsWindow(ui.Window):
                         )
 
         except Exception as e:
+            if str(e) == TOKEN_EXPIRED_MESSAGE:
+                self._notify_token_expired()
             carb.log_error(f"Failed to build asset tree view: {e}")
             self._update_tree_panel_with_error(f"Failed to load assets: {str(e)}")
+
+    def _notify_token_expired(self):
+        """Notifies the user that their token has expired."""
+        nm.post_notification(
+            "The token has expired. Please log in again. Now, you will continue browsing as a free user.",
+            duration=5.0,
+            status=nm.NotificationStatus.WARNING,
+        )
 
     def _on_selection_changed(self, items: List[CategoryItem]):
         """Handles selection change in the tree view."""
@@ -1017,7 +1037,6 @@ class SynthesisAssetsWindow(ui.Window):
             assets_data = await DATA_MANAGER.get_asset_list(
                 self._asset_type_id_selected,
                 params,
-                self._is_system_admin,
                 self._selected_visibility_tab_id,
             )
 
@@ -1109,6 +1128,8 @@ class SynthesisAssetsWindow(ui.Window):
             )
 
         except Exception as e:
+            if str(e) == TOKEN_EXPIRED_MESSAGE:
+                self._notify_token_expired()
             error_msg = f"Failed to load assets for category {category_id}: {e}"
             carb.log_error(error_msg)
             self._update_grid_with_error(error_msg)
@@ -1334,4 +1355,6 @@ class SynthesisAssetsWindow(ui.Window):
             return
         self._grid_panel_frame.clear()
         with self._grid_panel_frame:
-            ui.Label(error_message, style={"color": cl.red})
+            ui.Label(
+                error_message, style={"color": cl.red}, alignment=ui.Alignment.CENTER
+            )

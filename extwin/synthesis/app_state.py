@@ -1,5 +1,6 @@
 import carb
 
+
 class AppState:
     """A simple singleton class to store application state."""
 
@@ -15,11 +16,13 @@ class AppState:
             self._initialized = True
             self.token = None
             self.user_info = None
+            self.is_token_expired = True
+            self.is_system_admin = False
 
     @property
     def is_logged_in(self) -> bool:
-        """Determines if the user is logged in based on the token."""
-        return bool(self.token)
+        """Determines if the user is logged in based on the token and user info."""
+        return bool(self.token) and bool(self.user_info)
 
 # Create a single, shared instance of the application state
 APP_STATE = AppState()
