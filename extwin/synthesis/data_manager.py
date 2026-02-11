@@ -13,7 +13,7 @@ TOKEN_EXPIRED_CODE = 401  # Code for token expiration
 TOKEN_EXPIRED_MESSAGE = "Token has expired"
 
 BASE_URL1 = "https://synthesis-server.extwin.com"
-BASE_URL2 = "https://multiverse-server.vothing.com"
+BASE_URL2 = "https://multiverse-server.extwin.com"
 BASE_URL3 = "https://synthesis.extwin.com"
 
 ASSET_TYPES: list = [

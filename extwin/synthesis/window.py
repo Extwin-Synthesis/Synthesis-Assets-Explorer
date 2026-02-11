@@ -62,6 +62,12 @@ IMAGE_EMPTY_PATH = os.path.join(EXT_PATH, "asset", "empty.png")
 
 LOGIN_RESULT_LISTEN_PORT = 8090
 
+ALLOWED_ORIGINS = {
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://synthesis.extwin.com",
+}
+
 
 # --- Main Window Class ---
 class SynthesisAssetsWindow(ui.Window):
@@ -163,6 +169,7 @@ class SynthesisAssetsWindow(ui.Window):
             await self._web_runner.cleanup()
             self._web_runner = None
         app = web.Application()
+        app.router.add_options("/", self._handle_cors_preflight)
         app.router.add_post("/", self._handle_receive_login_result)
         self._web_runner = web.AppRunner(app)
         await self._web_runner.setup()
@@ -174,12 +181,37 @@ class SynthesisAssetsWindow(ui.Window):
         await site.start()
         print(f"Server running on http://127.0.0.1:{LOGIN_RESULT_LISTEN_PORT}")
 
+    async def _handle_cors_preflight(self, request: web.Request):
+        origin = request.headers.get("Origin")
+        if origin not in ALLOWED_ORIGINS:
+            return web.Response(status=403)
+
+        return web.Response(
+            status=204,
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+            },
+        )
+
     async def _handle_receive_login_result(self, request: web.Request):
+        origin = str(request.headers.get("Origin")).lower()
+        if origin not in ALLOWED_ORIGINS:
+            return web.json_response(
+                {"error": "Origin not allowed"},
+                status=403,
+                headers={"Access-Control-Allow-Origin": origin},
+            )
         try:
             data = await request.json()
         except Exception as e:
             carb.log_error(f"Failed to parse login result JSON: {e}")
-            return web.json_response({"error": "Invalid JSON"}, status=400)
+            return web.json_response(
+                {"error": "Invalid JSON"},
+                status=400,
+                headers={"Access-Control-Allow-Origin": origin},
+            )
 
         token = data.get("Token")
         login_user_info = data.get("LoginUserInfo", None)
@@ -198,7 +230,10 @@ class SynthesisAssetsWindow(ui.Window):
                 duration=2.0,
                 status=nm.NotificationStatus.INFO,
             )
-            return web.json_response({"status": "success"})
+            return web.json_response(
+                {"status": "success"},
+                headers={"Access-Control-Allow-Origin": origin},
+            )
         else:
             carb.log_warn("Login result missing Token or LoginUserInfo")
             nm.post_notification(
@@ -206,7 +241,11 @@ class SynthesisAssetsWindow(ui.Window):
                 duration=2.0,
                 status=nm.NotificationStatus.WARNING,
             )
-            return web.json_response({"error": "Missing Token or UserInfo"}, status=400)
+            return web.json_response(
+                {"error": "Missing Token or UserInfo"},
+                status=400,
+                headers={"Access-Control-Allow-Origin": origin},
+            )
 
     # --- UI Rebuilding Utilities ---
     def _rebuild_main_view(self):
@@ -1284,6 +1323,8 @@ class SynthesisAssetsWindow(ui.Window):
                         word_wrap=True,
                         height=0,
                         alignment=ui.Alignment.CENTER,
+                        elided_text=True,
+                        tooltip=item_name,
                     )
                     ui.Spacer(height=self._gap)
 
@@ -1315,7 +1356,7 @@ class SynthesisAssetsWindow(ui.Window):
         if _asset_type_id == "_3dGS":
             if data and data.get("Id"):
                 asyncio.ensure_future(self._log_asset_load_record(data))
-                return f"{BASE_URL1}/api/Usd/UsdzFile/{data['Id']}.usdz"
+                return f"{BASE_URL1}/api/Usd/UsdzFile/{data['Id']}.usdz?t={time.time()}"
             else:
                 return ""
         else:
