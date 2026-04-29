@@ -21,7 +21,7 @@ import carb
 from omni.kit.menu.utils import MenuItemDescription, add_menu_items, remove_menu_items, refresh_menu_items
 import omni.kit.actions.core
 
-from .window import SynthesisAssetsWindow,ASSETS_EXPLORER_NAME
+from .window import ASSETS_EXPLORER_NAME, SynthesisAssetsWindow
 
 ACTION_ID = "toggle_assets_explorer"
 
@@ -30,19 +30,19 @@ MENU_NAME = "Extwin"
 
 class Extension(omni.ext.IExt):
     def on_startup(self, ext_id: str):
-        carb.log_info("Startting up")
+        carb.log_info("[extwin.synthesis] Extension startup")
         self.ext_id = ext_id
-        # Build Window
+        # Build the main window in hidden state first.
         self._window = SynthesisAssetsWindow(False)
         self._window.set_visibility_changed_fn(self._on_visibility_changed)
 
-        # Add Menus
+        # Register action + menu entry.
         self.action_registry = omni.kit.actions.core.get_action_registry()
         self.action_registry.register_action(
             ext_id,
             ACTION_ID,
             self._toggle_assets_explorer,
-            description=f"Toggle  extwin assets",
+            description="Toggle Extwin Assets window",
         )
         self._menu_items = [
             MenuItemDescription(
@@ -52,13 +52,13 @@ class Extension(omni.ext.IExt):
             )
         ]
 
-        add_menu_items(self._menu_items,MENU_NAME)
+        add_menu_items(self._menu_items, MENU_NAME)
 
-        # For Dev
+        # Auto-open once during startup to reduce manual clicks in daily dev.
         asyncio.ensure_future(self._execute_toggle_action_later())
 
     def on_shutdown(self):
-        carb.log_info("Shutting down")
+        carb.log_info("[extwin.synthesis] Extension shutdown")
         remove_menu_items(self._menu_items, MENU_NAME)
 
         self.action_registry.deregister_action(self.ext_id, ACTION_ID)
@@ -81,11 +81,11 @@ class Extension(omni.ext.IExt):
 
     def _on_visibility_changed(self, visible):
         refresh_menu_items(MENU_NAME)
-        carb.log_info(f"On window visibility changed,current visible:{visible}")
+        carb.log_info(f"[extwin.synthesis] Window visibility changed: {visible}")
 
     def _get_window_visible(self):
         return self._window.visible if self._window else False
 
     def _toggle_assets_explorer(self):
         self._window.visible = not self._window.visible
-        carb.log_info(f"Toggle asset window,current visible:{self._window.visible}")
+        carb.log_info(f"[extwin.synthesis] Toggle assets window: {self._window.visible}")

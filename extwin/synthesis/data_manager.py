@@ -13,7 +13,7 @@ TOKEN_EXPIRED_CODE = 401  # Code for token expiration
 TOKEN_EXPIRED_MESSAGE = "Token has expired"
 
 BASE_URL1 = "https://synthesis-server.extwin.com"
-BASE_URL2 = "https://multiverse-server.extwin.com"
+BASE_URL2 = "https://synthesis-multiverse.extwin.com"
 BASE_URL3 = "https://synthesis.extwin.com"
 
 ASSET_TYPES: list = [
@@ -270,7 +270,7 @@ class DataManager:
     async def get_category_tree(
         self,
         asset_type_id: str,
-        _selected_visibility_tab_id: str = "Public",
+        visibility_tab_id: str = "Public",
     ) -> List[Dict[str, Any]]:
         """Fetches category tree data from the main backend API."""
         selected_asset_type = next(
@@ -281,7 +281,7 @@ class DataManager:
             carb.log_error("Invalid asset type selection.")
             return
         _target_url = ""
-        if _selected_visibility_tab_id == "Public":
+        if visibility_tab_id == "Public":
             if APP_STATE.is_system_admin:
                 _target_url = selected_asset_type["CategoryListUrl"]
             else:
@@ -289,7 +289,7 @@ class DataManager:
                     _target_url = selected_asset_type["CategoryListUrlPrivate"]
                 else:
                     _target_url = selected_asset_type["CategoryListUrlFree"]
-        elif _selected_visibility_tab_id == "Private":
+        elif visibility_tab_id == "Private":
             _target_url = selected_asset_type["CategoryListUrlPrivate"]
 
         _list = await self._request("GET", _target_url)
@@ -298,7 +298,7 @@ class DataManager:
             carb.log_error("Category list response is not a list.")
             return []
         else:
-            _is_system = True if _selected_visibility_tab_id == "Public" else False
+            _is_system = True if visibility_tab_id == "Public" else False
             _filtered_list = [x for x in _list if x.get("IsSystem") == _is_system]
             return _filtered_list
 
@@ -306,7 +306,7 @@ class DataManager:
         self,
         asset_type_id: str,
         params: Dict[str, Any],
-        _selected_visibility_tab_id: str = "Public",
+        visibility_tab_id: str = "Public",
     ) -> Dict[str, Any]:
         """Fetches asset list from the main backend API."""
         selected_asset_type = next(
@@ -317,7 +317,7 @@ class DataManager:
             carb.log_error("Invalid asset type selection.")
             return
         _target_url = ""
-        if _selected_visibility_tab_id == "Public":
+        if visibility_tab_id == "Public":
             params["DataType"] = 1  # Public
             if APP_STATE.is_system_admin:
                 _target_url = selected_asset_type["CategoryItemContentUrl"]
@@ -326,7 +326,7 @@ class DataManager:
                     _target_url = selected_asset_type["CategoryItemContentUrlPrivate"]
                 else:
                     _target_url = selected_asset_type["CategoryItemContentUrlFree"]
-        elif _selected_visibility_tab_id == "Private":
+        elif visibility_tab_id == "Private":
             _target_url = selected_asset_type["CategoryItemContentUrlPrivate"]
             params["DataType"] = 2  # Private
 

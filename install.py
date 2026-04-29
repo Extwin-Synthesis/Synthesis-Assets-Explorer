@@ -49,14 +49,7 @@ def install_dependencies(requirements_file):
 
 
 def modify_kit_file(kit_path):
-    """Modify .kit file (TOML format) and preserve original formatting"""
-    try:
-        import tomlkit
-    except ImportError:
-        print("tomlkit not found. Installing...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "tomlkit"])
-        import tomlkit
-
+    """Modify .kit file by text patching to avoid TOML redefinition issues."""
     if not kit_path.exists():
         print(f"Config file not found, skipping: {kit_path}")
         return
@@ -66,45 +59,40 @@ def modify_kit_file(kit_path):
     try:
         with open(kit_path, "r", encoding="utf-8") as f:
             content = f.read()
-            doc = tomlkit.parse(content)
 
+        ext_name = "extwin.synthesis_explorer"
+        dep_line = f'"{ext_name}" = {{}}'
+
+        # Already configured
+        if ext_name in content:
+            print(f"  Dependency already exists: {ext_name}")
+            print(f"  No changes needed: {kit_path.name}")
+            return
+
+        lines = content.splitlines()
         modified = False
 
-        # 1. [dependencies]
-        if "dependencies" not in doc:
-            doc["dependencies"] = tomlkit.table()
-            print("  Created [dependencies]")
+        dep_header_idx = None
+        for i, line in enumerate(lines):
+            if line.strip() == "[dependencies]":
+                dep_header_idx = i
+                break
 
-        deps = doc["dependencies"]
-        ext_name = "extwin.synthesis_explorer"
-        if ext_name not in deps:
-            deps[ext_name] = tomlkit.inline_table()
-            print(f"  Added dependency: {ext_name}")
+        if dep_header_idx is None:
+            # Create [dependencies] at end of file
+            if lines and lines[-1].strip() != "":
+                lines.append("")
+            lines.append("[dependencies]")
+            lines.append(dep_line)
             modified = True
+            print("  Created [dependencies]")
+            print(f"  Added dependency: {ext_name}")
         else:
-            print(f"  Dependency already exists: {ext_name}")
-
-        # # 2. [settings.app.exts.folders] '++'
-        # try:
-        #     node = doc
-        #     for key in ["settings", "app", "exts", "folders"]:
-        #         if key not in node:
-        #             node[key] = tomlkit.table()
-        #         node = node[key]
-
-        #     if "++" not in node:
-        #         node["++"] = tomlkit.array()
-        #         node["++"].append("${app}/../extwin")
-        #         print("  Created '++' and added '${app}/../extwin'")
-        #         modified = True
-        #     elif "${app}/../extwin" not in node["++"]:
-        #         node["++"].append("${app}/../extwin")
-        #         print("  Added to '++': ${app}/../extwin")
-        #         modified = True
-        #     else:
-        #         print("  '${app}/../extwin' already in '++'")
-        # except Exception as e:
-        #     print(f"Warning: Failed to update exts.folders: {e}")
+            # Insert right after [dependencies]
+            insert_idx = dep_header_idx + 1
+            lines.insert(insert_idx, dep_line)
+            modified = True
+            print(f"  Added dependency: {ext_name}")
 
         # 3. Save with backup
         if modified:
@@ -113,7 +101,7 @@ def modify_kit_file(kit_path):
                 shutil.copy2(kit_path, backup)
                 print(f"  Backup saved: {backup.name}")
             with open(kit_path, "w", encoding="utf-8") as f:
-                f.write(tomlkit.dumps(doc))
+                f.write("\n".join(lines) + "\n")
             print(f"  Updated: {kit_path.name}")
         else:
             print(f"  No changes needed: {kit_path.name}")
