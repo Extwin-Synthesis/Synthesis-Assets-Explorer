@@ -11,7 +11,7 @@ import omni.usd
 from omni.kit.window.popup_dialog import MessageDialog
 from pxr import Sdf
 
-from .data_manager import BASE_URL2
+from .catalog import scene_usd_url
 
 
 def load_scene(owner: Any) -> None:
@@ -34,7 +34,7 @@ def load_scene(owner: Any) -> None:
         carb.log_error("Selected scene data missing 'Id'.")
         return
 
-    target_usd_url = f"{BASE_URL2}/Scene/{scene_id}/main_ov.usd?t={time.time()}"
+    target_usd_url = scene_usd_url(scene_id, time.time())
     carb.log_info(f"Target USD URL for scene load: {target_usd_url}")
     usd_context = omni.usd.get_context()
     current_stage = usd_context.get_stage()
